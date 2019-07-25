@@ -2,13 +2,14 @@ package main
 
 import (
 	"github.com/niftynei/glightning/jrpc2"
+	"github.com/rsbondi/multifund/rpc"
 )
 
 const FundMultiDescription = `Use external wallet funding feature to build a transaction to fund multiple channels
 provide {utxos} as an array of {"txid":vout} and {ids} in the form of {"id":sats, "id2":sats, ..."idn":sats}!`
 
 type MultiChannel struct {
-	Channels []FundChannelStartRequest
+	Channels []rpc.FundChannelStartRequest
 }
 
 func (m *MultiChannel) Call() (jrpc2.Result, error) {
@@ -23,9 +24,9 @@ func (f *MultiChannel) New() interface{} {
 	return &MultiChannel{}
 }
 
-func createMulti(chans []FundChannelStartRequest) (interface{}, error) {
+func createMulti(chans []rpc.FundChannelStartRequest) (interface{}, error) {
 	for i, c := range chans {
-		result, err := FundChannelStart(c.Id, c.Amount)
+		result, err := rpc.FundChannelStart(c.Id, c.Amount)
 		if err != nil {
 			return nil, err
 		}

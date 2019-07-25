@@ -1,6 +1,16 @@
-package main
+package rpc
 
 // this is where the missing glightning rpc calls are implemented, eventually to be moved to glightning
+
+import (
+	"github.com/niftynei/glightning/glightning"
+)
+
+var lightning *glightning.Lightning
+
+func Init(g *glightning.Lightning) {
+	lightning = g
+}
 
 type FundChannelStartRequest struct {
 	Id       string `json:"id"`

@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/niftynei/glightning/glightning"
+	"github.com/rsbondi/multifund/rpc"
 	"github.com/rsbondi/multifund/wallet"
 )
 
@@ -26,6 +27,7 @@ var outputs map[string]*Outputs // hold node id to the vout position in the fund
 func main() {
 	plugin = glightning.NewPlugin(onInit)
 	lightning = glightning.NewLightning()
+	rpc.Init(lightning)
 
 	registerOptions(plugin)
 	registerMethods(plugin)

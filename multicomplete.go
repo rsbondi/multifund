@@ -4,13 +4,14 @@ import (
 	"fmt"
 
 	"github.com/niftynei/glightning/jrpc2"
+	"github.com/rsbondi/multifund/rpc"
 )
 
 const FundMultiCompleteDescription = `Use external wallet funding feature to build a transaction to fund multiple channels
 {transactions} is an array of object{"id":"nodeid", "txid":"txid", "txout":vout}`
 
 type MultiChannelComplete struct {
-	Txs []FundChannelCompleteRequest
+	Txs []rpc.FundChannelCompleteRequest
 }
 
 func (m *MultiChannelComplete) Call() (jrpc2.Result, error) {
@@ -25,9 +26,9 @@ func (f *MultiChannelComplete) New() interface{} {
 	return &MultiChannelComplete{}
 }
 
-func createMultiComplete(txs []FundChannelCompleteRequest) (interface{}, error) {
+func createMultiComplete(txs []rpc.FundChannelCompleteRequest) (interface{}, error) {
 	for _, t := range txs {
-		result, err := FundChannelComplete(t.Id, t.Txid, t.Txout)
+		result, err := rpc.FundChannelComplete(t.Id, t.Txid, t.Txout)
 		if err != nil {
 			return nil, err
 		}
