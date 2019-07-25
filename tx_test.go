@@ -5,6 +5,9 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/wire"
+
 	// "github.com/btcsuite/btcutil"
 	// "github.com/btcsuite/btcutil/hdkeychain"
 	// "hash"
@@ -16,9 +19,12 @@ import (
 )
 
 func TestCreateTransaction(t *testing.T) {
+	utxoHash, _ := chainhash.NewHashFromStr("6cb7c43cf84a4f7f88748b5abbe20fcc0d351c1331801fc51c3d41023beac47c")
+	o := []*wire.OutPoint{wire.NewOutPoint(utxoHash, 0)}
 	transaction, err := CreateTransaction(
 		[]*TxRecipient{&TxRecipient{"bcrt1q52g6zdr7la83fl3scx7an3znuu4dzy4paf2w2xx6u7j4af83pwzsa0ynrt", 91234}},
-		"6cb7c43cf84a4f7f88748b5abbe20fcc0d351c1331801fc51c3d41023beac47c", 0, &chaincfg.RegressionNetParams)
+		o,
+		&chaincfg.RegressionNetParams)
 	if err != nil {
 		fmt.Println(err)
 		return

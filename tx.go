@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
@@ -21,14 +20,14 @@ type TxRecipient struct {
 	Amount  int64
 }
 
-func CreateTransaction(destinations []*TxRecipient, txHash string, vout uint32, network *chaincfg.Params) (Transaction, error) {
+func CreateTransaction(destinations []*TxRecipient, utxos []*wire.OutPoint, network *chaincfg.Params) (Transaction, error) {
 	var transaction Transaction
 	tx := wire.NewMsgTx(2)
 
-	utxoHash, _ := chainhash.NewHashFromStr(txHash)
-	utxo := wire.NewOutPoint(utxoHash, vout)
-	txIn := wire.NewTxIn(utxo, nil, nil)
-	tx.AddTxIn(txIn)
+	for _, utxo := range utxos {
+		txIn := wire.NewTxIn(utxo, nil, nil)
+		tx.AddTxIn(txIn)
+	}
 
 	for _, destination := range destinations {
 		destinationAddress, err := btcutil.DecodeAddress(destination.Address, network)
