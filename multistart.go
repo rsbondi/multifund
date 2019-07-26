@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/niftynei/glightning/jrpc2"
 	"github.com/rsbondi/multifund/rpc"
+	"github.com/rsbondi/multifund/wallet"
 )
 
 const FundMultiDescription = `Use external wallet funding feature to build a transaction to fund multiple channels
@@ -25,13 +26,29 @@ func (f *MultiChannel) New() interface{} {
 }
 
 func createMulti(chans []rpc.FundChannelStartRequest) (interface{}, error) {
+	var recipients = make([]*TxRecipient, 0)
 	for i, c := range chans {
 		result, err := rpc.FundChannelStart(c.Id, c.Amount)
 		if err != nil {
 			return nil, err
 		}
-		outputs[c.Id] = &Outputs{i, c.Amount, result.FundingAddress}
+		amt := int64(c.Amount) // difference in wire and glightning
+		outputs[c.Id] = &Outputs{i, amt, result.FundingAddress}
+		recipients = append(recipients, &TxRecipient{result.FundingAddress, amt})
 	}
+
+	switch wallettype {
+	case wallet.WALLET_BITCOIN:
+		// use bitcoin rpc for utxos and change address
+	case wallet.WALLET_INTERNAL:
+		// use internall for utxos and change address
+
+	}
+	// TODO: get utxos and change address from wallet
+
+	// TODO: create tx
+
+	// TODO: call fundchannel_complete, if all is well broadcast
 
 	return nil, nil
 }

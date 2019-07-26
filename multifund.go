@@ -15,10 +15,11 @@ const VERSION = "0.0.1"
 var plugin *glightning.Plugin
 var lightning *glightning.Lightning
 var wallettype int
+var bitcoin *wallet.BitcoinWallet // we always use this at least for broadcasting the tx
 
 type Outputs struct {
 	Vout    int
-	Amount  uint64
+	Amount  int64
 	Address string
 }
 
@@ -51,6 +52,7 @@ func onInit(plugin *glightning.Plugin, options map[string]string, config *glight
 	}
 	lightning.StartUp(config.RpcFile, config.LightningDir)
 
+	bitcoin = wallet.NewBitcoinWallet()
 }
 
 func registerOptions(p *glightning.Plugin) {

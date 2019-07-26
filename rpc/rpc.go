@@ -61,3 +61,23 @@ func FundChannelComplete(id string, txid string, vout int) (*FundChannelComplete
 	err := lightning.Request(req, result)
 	return result, err
 }
+
+type ListConfigsRequest struct{}
+
+func (c *ListConfigsRequest) Name() string {
+	return "listconfigs"
+}
+
+type ListConfigsResponse struct {
+	BitcoinRpcUser     string `json:"bitcoin-rpcuser"`
+	BitcoinRpcPassword string `json:"bitcoin-rpcpassword"`
+	BitcoinRpcConnect  string `json:"bitcoin-rpcconnect"` // host:port
+	BitcoinRpcPort     int    `json:"bitcoin-port"`       // can this be used if connect is just the host? it works with localhost
+}
+
+func ListConfigs() (*ListConfigsResponse, error) {
+	result := &ListConfigsResponse{}
+	req := &ListConfigsRequest{}
+	err := lightning.Request(req, result)
+	return result, err
+}
