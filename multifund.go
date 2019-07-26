@@ -18,9 +18,9 @@ var wallettype int
 var bitcoin *wallet.BitcoinWallet // we always use this at least for broadcasting the tx
 
 type Outputs struct {
-	Vout    int
-	Amount  int64
-	Address string
+	Vout    int    `json:"vout"`
+	Amount  int64  `json:"amount"`
+	Address string `json:"address"`
 }
 
 var outputs map[string]*Outputs // hold node id to the vout position in the funding tx

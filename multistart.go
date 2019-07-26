@@ -14,7 +14,7 @@ type MultiChannel struct {
 }
 
 func (m *MultiChannel) Call() (jrpc2.Result, error) {
-	return createMulti(m.Channels)
+	return createMulti(&m.Channels)
 }
 
 func (f *MultiChannel) Name() string {
@@ -25,9 +25,10 @@ func (f *MultiChannel) New() interface{} {
 	return &MultiChannel{}
 }
 
-func createMulti(chans []rpc.FundChannelStartRequest) (interface{}, error) {
+func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 	var recipients = make([]*TxRecipient, 0)
-	for i, c := range chans {
+	outputs = make(map[string]*Outputs, 0)
+	for i, c := range *chans {
 		result, err := rpc.FundChannelStart(c.Id, c.Amount)
 		if err != nil {
 			return nil, err
@@ -50,5 +51,6 @@ func createMulti(chans []rpc.FundChannelStartRequest) (interface{}, error) {
 
 	// TODO: call fundchannel_complete, if all is well broadcast
 
-	return nil, nil
+	resp := &outputs
+	return resp, nil
 }

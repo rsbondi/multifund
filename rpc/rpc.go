@@ -13,10 +13,10 @@ func Init(g *glightning.Lightning) {
 }
 
 type FundChannelStartRequest struct {
-	Id       string `json:"id"`
-	Amount   uint64 `json:"satoshi"`
-	FeeRate  string `json:"feerate,omitempty"`
-	Announce bool   `json:"announce"`
+	Id       string  `json:"id"`
+	Amount   float64 `json:"satoshi"`
+	FeeRate  string  `json:"feerate,omitempty"`
+	Announce bool    `json:"announce"`
 }
 
 func (f *FundChannelStartRequest) Name() string {
@@ -27,14 +27,14 @@ type FundChannelStartResponse struct {
 	FundingAddress string `json:"funding_address"`
 }
 
-func FundChannelStart(id string, amt uint64) (*FundChannelStartResponse, error) {
-	result := &FundChannelStartResponse{}
+func FundChannelStart(id string, amt float64) (*FundChannelStartResponse, error) {
+	var result FundChannelStartResponse
 	req := &FundChannelStartRequest{}
 	req.Id = id
 	req.Amount = amt
 	req.Announce = true
-	err := lightning.Request(req, result)
-	return result, err
+	err := lightning.Request(req, &result)
+	return &result, err
 }
 
 type FundChannelCompleteRequest struct {
