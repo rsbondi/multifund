@@ -7,6 +7,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/rsbondi/multifund/wallet"
 
 	// "github.com/btcsuite/btcutil"
 	// "github.com/btcsuite/btcutil/hdkeychain"
@@ -20,7 +21,7 @@ import (
 
 func TestCreateTransaction(t *testing.T) {
 	utxoHash, _ := chainhash.NewHashFromStr("6cb7c43cf84a4f7f88748b5abbe20fcc0d351c1331801fc51c3d41023beac47c")
-	o := []*wire.OutPoint{wire.NewOutPoint(utxoHash, 0)}
+	o := []wallet.UTXO{wallet.UTXO{Amount: 91235, OutPoint: *wire.NewOutPoint(utxoHash, 0)}}
 	transaction, err := CreateTransaction(
 		[]*TxRecipient{&TxRecipient{"bcrt1q52g6zdr7la83fl3scx7an3znuu4dzy4paf2w2xx6u7j4af83pwzsa0ynrt", 91234}},
 		o,

@@ -8,6 +8,7 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
+	"github.com/rsbondi/multifund/wallet"
 )
 
 type Transaction struct {
@@ -20,12 +21,12 @@ type TxRecipient struct {
 	Amount  int64
 }
 
-func CreateTransaction(destinations []*TxRecipient, utxos []*wire.OutPoint, network *chaincfg.Params) (Transaction, error) {
+func CreateTransaction(destinations []*TxRecipient, utxos []wallet.UTXO, network *chaincfg.Params) (Transaction, error) {
 	var transaction Transaction
 	tx := wire.NewMsgTx(2)
 
 	for _, utxo := range utxos {
-		txIn := wire.NewTxIn(utxo, nil, nil)
+		txIn := wire.NewTxIn(&utxo.OutPoint, nil, nil)
 		tx.AddTxIn(txIn)
 	}
 

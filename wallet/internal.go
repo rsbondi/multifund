@@ -15,7 +15,7 @@ func NewInternalWallet(l *glightning.Lightning) *InternalWallet {
 	}
 }
 
-func (i *InternalWallet) Utxos(amt uint64) []wire.OutPoint {
+func (i *InternalWallet) Utxos(amt uint64, fee uint64) []wire.OutPoint {
 	return nil
 }
 

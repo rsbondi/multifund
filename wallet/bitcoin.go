@@ -3,13 +3,13 @@ package wallet
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -20,13 +20,9 @@ import (
 
 type BitcoinWallet struct {
 	rpchost     string
-	rpcport     int
+	rpcport     string
 	rpcuser     string
 	rpcpassword string
-}
-
-func Satoshis(btc float32) uint64 {
-	return uint64(btc * float32(100000000))
 }
 
 func NewBitcoinWallet() *BitcoinWallet {
@@ -35,17 +31,14 @@ func NewBitcoinWallet() *BitcoinWallet {
 		log.Fatal(err)
 	}
 	var host, user, pass string
-	var port int
+	var port string
 	if cfg.BitcoinRpcConnect != "" && cfg.BitcoinRpcUser != "" && cfg.BitcoinRpcPassword != "" {
 		user = cfg.BitcoinRpcUser
 		pass = cfg.BitcoinRpcPassword
 		connect := strings.Split(cfg.BitcoinRpcConnect, ":")
 		host = connect[0]
-		port, err = strconv.Atoi(connect[1])
-		if err != nil {
-			log.Fatal(err)
-		}
-	} else if cfg.BitcoinRpcPort != 0 && cfg.BitcoinRpcUser != "" && cfg.BitcoinRpcPassword != "" {
+		port = connect[1]
+	} else if cfg.BitcoinRpcPort != "" && cfg.BitcoinRpcUser != "" && cfg.BitcoinRpcPassword != "" {
 		user = cfg.BitcoinRpcUser
 		pass = cfg.BitcoinRpcPassword
 		host = "127.0.0.1"
@@ -63,19 +56,19 @@ func NewBitcoinWallet() *BitcoinWallet {
 }
 
 type utxo struct {
-	Txid          []byte  `json:"txid"`
+	Txid          string  `json:"txid"`
 	Vout          uint32  `json:"vout"`
 	Amount        float32 `json:"amount"`
-	ScriptPubKey  []byte  `json:"scriptPubKey"`
-	RedeemScript  []byte  `json:"redeemScript"`
+	ScriptPubKey  string  `json:"scriptPubKey"`
+	RedeemScript  string  `json:"redeemScript"`
 	Confirmations uint    `json:"confirmations"`
 }
 
 type empty struct{}
 
-func makeResult(r interface{}) *RpcResult {
+func makeResult(r interface{}) RpcResult {
 	e := &RpcError{}
-	result := &RpcResult{
+	result := RpcResult{
 		Result: r,
 		Error:  e,
 	}
@@ -88,24 +81,25 @@ func (a ByMsat) Len() int           { return len(a) }
 func (a ByMsat) Less(i, j int) bool { return a[i].Amount < a[j].Amount }
 func (a ByMsat) Swap(i, j int)      { a[i].Amount, a[j].Amount = a[j].Amount, a[i].Amount }
 
-func (b *BitcoinWallet) Utxos(amt uint64) ([]wire.OutPoint, error) {
-	rate := b.EstimateSmartFee(100)
-	if rate.Error != nil {
-		return nil, errors.New(rate.Error.Message)
-	}
+func (b *BitcoinWallet) Utxos(amt uint64, fee uint64) ([]UTXO, error) {
 	minconf := uint(3)
 	unspent := make([]utxo, 0)
 	result := makeResult(&unspent)
 	b.RpcPost("listunspent", []empty{}, &result)
-	fee := Satoshis(rate.Result.(EstimateSmartFeeResult).Feerate / 1000.0) // TODO: calculate kb
 	dust := uint64(1000)
 	candidates := make([]utxo, 0)
 	for _, u := range unspent {
 		sats := Satoshis(u.Amount)
 		if sats == amt+fee && u.Confirmations > minconf {
-			h, _ := chainhash.NewHash(u.Txid)
+			txid, err := hex.DecodeString(u.Txid)
+			if err != nil {
+				log.Printf("unable to decode txid %s\n", err)
+
+			}
+			h, _ := chainhash.NewHash(txid)
 			o := wire.NewOutPoint(h, u.Vout)
-			return []wire.OutPoint{*o}, nil
+			utxos := []UTXO{UTXO{Satoshis(u.Amount), *o}}
+			return utxos, nil
 		}
 		if sats > amt+fee+dust && u.Confirmations > minconf {
 			candidates = append(candidates, u)
@@ -114,22 +108,34 @@ func (b *BitcoinWallet) Utxos(amt uint64) ([]wire.OutPoint, error) {
 	if len(candidates) == 0 {
 		return nil, errors.New("no utxo candidates available") // TODO: try multiple
 	}
-	sort.Sort(ByMsat(candidates))
-	u := candidates[0]
-	h, _ := chainhash.NewHash(u.Txid)
-	o := wire.NewOutPoint(h, u.Vout)
 
-	return []wire.OutPoint{*o}, nil
+	sort.Sort(ByMsat(candidates))
+	c := candidates[0]
+	txid, err := hex.DecodeString(c.Txid)
+	if err != nil {
+		log.Printf("unable to decode txid %s\n", err)
+
+	}
+	h, err := chainhash.NewHash(txid)
+	if err != nil {
+		log.Printf("unable to create hash from txid %s\n", err)
+
+	}
+	o := wire.NewOutPoint(h, c.Vout)
+
+	utxos := []UTXO{UTXO{Satoshis(c.Amount), *o}}
+	return utxos, nil
 }
 
 type EstimateSmartFeeResult struct {
 	Feerate float32 `json:"feerate"`
 }
 
-func (b *BitcoinWallet) EstimateSmartFee(target uint) *RpcResult {
+func (b *BitcoinWallet) EstimateSmartFee(target uint) RpcResult {
 	fee := EstimateSmartFeeResult{}
 	result := makeResult(&fee)
 	b.RpcPost("estimatesmartfee", []uint{target}, &result)
+
 	return result
 }
 
@@ -155,7 +161,7 @@ type RpcCall struct {
 }
 
 func (b *BitcoinWallet) RpcPost(method string, params interface{}, result interface{}) error {
-	url := fmt.Sprintf("%s:%d", b.rpchost, b.rpcport)
+	url := fmt.Sprintf("http://%s:%s", b.rpchost, b.rpcport)
 	rpcCall := &RpcCall{
 		Id:      time.Now().Unix(),
 		Method:  method,
@@ -164,8 +170,9 @@ func (b *BitcoinWallet) RpcPost(method string, params interface{}, result interf
 	}
 	jsoncall, err := json.Marshal(rpcCall)
 	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(jsoncall))
-	req.Header.Add("Authorization", fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", b.rpcuser, b.rpcpassword)))))
-	req.Header.Add("Content-type", "application/json")
+	basic := fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", b.rpcuser, b.rpcpassword))))
+	req.Header.Set("Authorization", basic)
+	// req.Header.Add("Content-type", "application/json")
 	client := &http.Client{Timeout: time.Second * 10}
 	res, err := client.Do(req)
 	if err != nil {
@@ -173,12 +180,8 @@ func (b *BitcoinWallet) RpcPost(method string, params interface{}, result interf
 	}
 	defer res.Body.Close()
 
-	rpcres := &RpcResult{
-		Result: result,
-		Error:  &RpcError{},
-	}
+	err = json.NewDecoder(res.Body).Decode(result)
 
-	err = json.NewDecoder(res.Body).Decode(rpcres)
 	return err
 }
 
