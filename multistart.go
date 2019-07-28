@@ -29,14 +29,14 @@ func (f *MultiChannel) New() interface{} {
 }
 
 func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
-	var recipients = make([]*TxRecipient, 0)
-	outputs = make(map[string]*Outputs, 0)
+	var recipients = make([]*wallet.TxRecipient, 0)
+	outputs = make(map[string]*wallet.Outputs, 0)
 	inamt := uint64(0)
 	rate := bitcoin.EstimateSmartFee(100)
 	if rate.Error != nil {
 		return nil, errors.New(rate.Error.Message)
 	}
-	fee := wallet.Satoshis(rate.Result.(*wallet.EstimateSmartFeeResult).Feerate / 1000.0) // TODO: calculate kb
+	fee := wallet.Satoshis(rate.Result.(*wallet.EstimateSmartFeeResult).Feerate/1000.0) * uint64(150+50*len(*chans)) // crude size calc
 
 	for i, c := range *chans {
 		result, err := rpc.FundChannelStart(c.Id, c.Amount)
@@ -45,8 +45,8 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 		}
 		amt := int64(c.Amount) // difference in wire and glightning
 		inamt += uint64(c.Amount)
-		outputs[c.Id] = &Outputs{i, amt, result.FundingAddress}
-		recipients = append(recipients, &TxRecipient{result.FundingAddress, amt})
+		outputs[c.Id] = &wallet.Outputs{i, amt, result.FundingAddress}
+		recipients = append(recipients, &wallet.TxRecipient{result.FundingAddress, amt})
 	}
 
 	var wally wallet.Wallet
@@ -67,16 +67,11 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 	for _, u := range utxos {
 		utxoamt += u.Amount
 	}
-	recipients = append(recipients, &TxRecipient{change, int64(utxoamt - fee)})
-	tx, err := CreateTransaction(recipients, utxos, &chaincfg.RegressionNetParams)
+	recipients = append(recipients, &wallet.TxRecipient{change, int64(utxoamt - fee)})
+	tx, err := wallet.CreateTransaction(recipients, utxos, &chaincfg.RegressionNetParams)
 	if err != nil {
 		return nil, err
 	}
-	return tx.UnsignedTx, nil
-	// TODO: get utxos and change address from wallet
-
-	// TODO: create tx
-
-	// TODO: call fundchannel_complete, if all is well broadcast
+	return tx.String(), nil
 
 }

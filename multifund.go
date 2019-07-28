@@ -17,13 +17,10 @@ var lightning *glightning.Lightning
 var wallettype int
 var bitcoin *wallet.BitcoinWallet // we always use this at least for broadcasting the tx
 
-type Outputs struct {
-	Vout    int    `json:"vout"`
-	Amount  int64  `json:"amount"`
-	Address string `json:"address"`
-}
-
-var outputs map[string]*Outputs // hold node id to the vout position in the funding tx
+// TODO: not sure if to keep this global and restrict to one call at a time,
+//   could check for zero length to limit
+//   the other option would be to keep it local and as a return value
+var outputs map[string]*wallet.Outputs // hold node id to the vout position in the funding tx
 
 func main() {
 	plugin = glightning.NewPlugin(onInit)

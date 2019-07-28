@@ -1,4 +1,4 @@
-package main
+package wallet
 
 import (
 	"bytes"
@@ -8,12 +8,26 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
-	"github.com/rsbondi/multifund/wallet"
 )
 
 type Transaction struct {
-	TxId       string `json:"txid"`
-	UnsignedTx string `json:"unsignedtx"`
+	TxId     string
+	Signed   []byte
+	Unsigned []byte
+}
+
+type Outputs struct {
+	Vout    int    `json:"vout"`
+	Amount  int64  `json:"amount"`
+	Address string `json:"address"`
+}
+
+func (t *Transaction) String() string {
+	if t.Signed != nil {
+		return hex.EncodeToString(t.Signed)
+	} else {
+		return hex.EncodeToString(t.Unsigned)
+	}
 }
 
 type TxRecipient struct {
@@ -21,7 +35,7 @@ type TxRecipient struct {
 	Amount  int64
 }
 
-func CreateTransaction(destinations []*TxRecipient, utxos []wallet.UTXO, network *chaincfg.Params) (Transaction, error) {
+func CreateTransaction(destinations []*TxRecipient, utxos []UTXO, network *chaincfg.Params) (Transaction, error) {
 	var transaction Transaction
 	tx := wire.NewMsgTx(2)
 
@@ -43,6 +57,6 @@ func CreateTransaction(destinations []*TxRecipient, utxos []wallet.UTXO, network
 	tx.Serialize(&unsignedTx)
 	transactionHash := tx.TxHash()
 	transaction.TxId = transactionHash.String()
-	transaction.UnsignedTx = hex.EncodeToString(unsignedTx.Bytes())
+	transaction.Unsigned = unsignedTx.Bytes()
 	return transaction, nil
 }

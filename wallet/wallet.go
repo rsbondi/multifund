@@ -18,6 +18,8 @@ type Wallet interface {
 
 	// GetChangeAddress provides where to send the change
 	ChangeAddress() string
+
+	Sign(tx *Transaction, outputs map[string]*Outputs)
 }
 
 type UTXO struct {
