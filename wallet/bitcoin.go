@@ -140,7 +140,10 @@ func (b *BitcoinWallet) EstimateSmartFee(target uint) RpcResult {
 }
 
 func (b *BitcoinWallet) ChangeAddress() string {
-	return ""
+	addr := ""
+	result := makeResult(&addr)
+	b.RpcPost("getnewaddress", []string{"", "bech32"}, &result)
+	return addr
 }
 
 type RpcError struct {
