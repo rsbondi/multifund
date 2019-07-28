@@ -19,12 +19,21 @@ type Wallet interface {
 	// GetChangeAddress provides where to send the change
 	ChangeAddress() string
 
-	Sign(tx *Transaction, outputs map[string]*Outputs)
+	Sign(tx *Transaction, utxos []UTXO)
 }
 
 type UTXO struct {
-	Amount uint64
+	Amount  uint64
+	Address string
 	wire.OutPoint
+}
+
+func reverseBytes(b []byte) []byte {
+	newbytes := make([]byte, len(b))
+	for i, j := 0, len(b)-1; i < j; i, j = i+1, j-1 {
+		newbytes[i], newbytes[j] = b[j], b[i]
+	}
+	return newbytes
 }
 
 func Satoshis(btc float32) uint64 {

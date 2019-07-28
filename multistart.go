@@ -45,8 +45,8 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 		}
 		amt := int64(c.Amount) // difference in wire and glightning
 		inamt += uint64(c.Amount)
-		outputs[c.Id] = &wallet.Outputs{i, amt, result.FundingAddress}
-		recipients = append(recipients, &wallet.TxRecipient{result.FundingAddress, amt})
+		outputs[c.Id] = &wallet.Outputs{Vout: i, Amount: amt, Address: result.FundingAddress}
+		recipients = append(recipients, &wallet.TxRecipient{Address: result.FundingAddress, Amount: amt})
 	}
 
 	var wally wallet.Wallet
@@ -67,11 +67,14 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 	for _, u := range utxos {
 		utxoamt += u.Amount
 	}
-	recipients = append(recipients, &wallet.TxRecipient{change, int64(utxoamt - fee)})
+	recipients = append(recipients, &wallet.TxRecipient{Address: change, Amount: int64(utxoamt - fee)})
 	tx, err := wallet.CreateTransaction(recipients, utxos, &chaincfg.RegressionNetParams)
 	if err != nil {
 		return nil, err
 	}
+
+	wally.Sign(&tx, utxos)
+
 	return tx.String(), nil
 
 }

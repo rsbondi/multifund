@@ -55,10 +55,11 @@ func NewBitcoinWallet() *BitcoinWallet {
 	}
 }
 
-type utxo struct {
+type bitcoinUtxo struct {
 	Txid          string  `json:"txid"`
 	Vout          uint32  `json:"vout"`
 	Amount        float32 `json:"amount"`
+	Address       string  `json:"address"`
 	ScriptPubKey  string  `json:"scriptPubKey"`
 	RedeemScript  string  `json:"redeemScript"`
 	Confirmations uint    `json:"confirmations"`
@@ -75,7 +76,7 @@ func makeResult(r interface{}) RpcResult {
 	return result
 }
 
-type ByMsat []utxo
+type ByMsat []bitcoinUtxo
 
 func (a ByMsat) Len() int           { return len(a) }
 func (a ByMsat) Less(i, j int) bool { return a[i].Amount < a[j].Amount }
@@ -83,11 +84,11 @@ func (a ByMsat) Swap(i, j int)      { a[i].Amount, a[j].Amount = a[j].Amount, a[
 
 func (b *BitcoinWallet) Utxos(amt uint64, fee uint64) ([]UTXO, error) {
 	minconf := uint(3)
-	unspent := make([]utxo, 0)
+	unspent := make([]bitcoinUtxo, 0)
 	result := makeResult(&unspent)
 	b.RpcPost("listunspent", []empty{}, &result)
 	dust := uint64(1000)
-	candidates := make([]utxo, 0)
+	candidates := make([]bitcoinUtxo, 0)
 	for _, u := range unspent {
 		sats := Satoshis(u.Amount)
 		if sats == amt+fee && u.Confirmations > minconf {
@@ -96,9 +97,9 @@ func (b *BitcoinWallet) Utxos(amt uint64, fee uint64) ([]UTXO, error) {
 				log.Printf("unable to decode txid %s\n", err)
 
 			}
-			h, _ := chainhash.NewHash(txid)
+			h, _ := chainhash.NewHash(reverseBytes(txid))
 			o := wire.NewOutPoint(h, u.Vout)
-			utxos := []UTXO{UTXO{Satoshis(u.Amount), *o}}
+			utxos := []UTXO{UTXO{Satoshis(u.Amount), u.Address, *o}}
 			return utxos, nil
 		}
 		if sats > amt+fee+dust && u.Confirmations > minconf {
@@ -111,19 +112,20 @@ func (b *BitcoinWallet) Utxos(amt uint64, fee uint64) ([]UTXO, error) {
 
 	sort.Sort(ByMsat(candidates))
 	c := candidates[0]
+	log.Printf("txid for input: %s", c.Txid)
 	txid, err := hex.DecodeString(c.Txid)
 	if err != nil {
 		log.Printf("unable to decode txid %s\n", err)
 
 	}
-	h, err := chainhash.NewHash(txid)
+	h, err := chainhash.NewHash(reverseBytes(txid))
 	if err != nil {
 		log.Printf("unable to create hash from txid %s\n", err)
 
 	}
 	o := wire.NewOutPoint(h, c.Vout)
 
-	utxos := []UTXO{UTXO{Satoshis(c.Amount), *o}}
+	utxos := []UTXO{UTXO{Satoshis(c.Amount), c.Address, *o}}
 	return utxos, nil
 }
 
@@ -187,7 +189,32 @@ func (b *BitcoinWallet) RpcPost(method string, params interface{}, result interf
 	return err
 }
 
-func (b *BitcoinWallet) Sign(tx *Transaction, outputs map[string]*Outputs) {
+type BitcoinSignResult struct {
+	Hex      string `json:"hex"`
+	Complete bool   `json:"complete"`
+}
+
+func (b *BitcoinWallet) Sign(tx *Transaction, utxos []UTXO) {
+	pks := make([]string, 0)
+	for _, u := range utxos {
+		key := ""
+		result := makeResult(&key)
+		b.RpcPost("dumpprivkey", []string{u.Address}, &result)
+		pks = append(pks, key)
+
+	}
+
+	raw := BitcoinSignResult{}
+	rawresult := makeResult(&raw)
+	b.RpcPost("signrawtransactionwithkey", []interface{}{tx.String(), pks}, &rawresult)
+	log.Printf("signed: %s, %s", pks, raw.Hex)
+	signed, err := hex.DecodeString(raw.Hex)
+	if err != nil {
+		log.Printf("error signing tx: ", err)
+
+		return
+	}
+	tx.Signed = signed
 
 }
 
