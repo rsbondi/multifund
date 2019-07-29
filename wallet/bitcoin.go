@@ -76,7 +76,7 @@ func makeResult(r interface{}) RpcResult {
 	return result
 }
 
-type ByMsat []bitcoinUtxo
+type ByMsat []*bitcoinUtxo
 
 func (a ByMsat) Len() int           { return len(a) }
 func (a ByMsat) Less(i, j int) bool { return a[i].Amount < a[j].Amount }
@@ -88,7 +88,7 @@ func (b *BitcoinWallet) Utxos(amt uint64, fee uint64) ([]UTXO, error) {
 	result := makeResult(&unspent)
 	b.RpcPost("listunspent", []empty{}, &result)
 	dust := uint64(1000)
-	candidates := make([]bitcoinUtxo, 0)
+	candidates := make([]*bitcoinUtxo, 0)
 	for _, u := range unspent {
 		sats := Satoshis(u.Amount)
 		if sats == amt+fee && u.Confirmations > minconf {
@@ -103,7 +103,7 @@ func (b *BitcoinWallet) Utxos(amt uint64, fee uint64) ([]UTXO, error) {
 			return utxos, nil
 		}
 		if sats > amt+fee+dust && u.Confirmations > minconf {
-			candidates = append(candidates, u)
+			candidates = append(candidates, &u)
 		}
 	}
 	if len(candidates) == 0 {
@@ -112,7 +112,6 @@ func (b *BitcoinWallet) Utxos(amt uint64, fee uint64) ([]UTXO, error) {
 
 	sort.Sort(ByMsat(candidates))
 	c := candidates[0]
-	log.Printf("txid for input: %s", c.Txid)
 	txid, err := hex.DecodeString(c.Txid)
 	if err != nil {
 		log.Printf("unable to decode txid %s\n", err)
@@ -166,6 +165,7 @@ type RpcCall struct {
 }
 
 func (b *BitcoinWallet) RpcPost(method string, params interface{}, result interface{}) error {
+	// TODO: send error if not properly initialized with host and port
 	url := fmt.Sprintf("http://%s:%s", b.rpchost, b.rpcport)
 	rpcCall := &RpcCall{
 		Id:      time.Now().Unix(),

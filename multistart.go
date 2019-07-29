@@ -38,6 +38,7 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 	}
 	fee := wallet.Satoshis(rate.Result.(*wallet.EstimateSmartFeeResult).Feerate/1000.0) * uint64(150+50*len(*chans)) // crude size calc
 
+	recipamt := int64(0)
 	for i, c := range *chans {
 		result, err := rpc.FundChannelStart(c.Id, c.Amount)
 		if err != nil {
@@ -46,6 +47,7 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 		amt := int64(c.Amount) // difference in wire and glightning
 		inamt += uint64(c.Amount)
 		outputs[c.Id] = &wallet.Outputs{Vout: i, Amount: amt, Address: result.FundingAddress}
+		recipamt += amt
 		recipients = append(recipients, &wallet.TxRecipient{Address: result.FundingAddress, Amount: amt})
 	}
 
@@ -67,7 +69,7 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 	for _, u := range utxos {
 		utxoamt += u.Amount
 	}
-	recipients = append(recipients, &wallet.TxRecipient{Address: change, Amount: int64(utxoamt - fee)})
+	recipients = append(recipients, &wallet.TxRecipient{Address: change, Amount: int64(utxoamt-fee) - recipamt})
 	tx, err := wallet.CreateTransaction(recipients, utxos, &chaincfg.RegressionNetParams)
 	if err != nil {
 		return nil, err
