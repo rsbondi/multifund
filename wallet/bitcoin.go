@@ -203,11 +203,12 @@ func (b *BitcoinWallet) Sign(tx *Transaction, utxos []UTXO) {
 		pks = append(pks, key)
 
 	}
+	log.Printf("unsigned: %s", tx.String())
 
 	raw := BitcoinSignResult{}
 	rawresult := makeResult(&raw)
 	b.RpcPost("signrawtransactionwithkey", []interface{}{tx.String(), pks}, &rawresult)
-	log.Printf("signed: %s, %s", pks, raw.Hex)
+	log.Printf("signed: %s", raw.Hex)
 	signed, err := hex.DecodeString(raw.Hex)
 	if err != nil {
 		log.Printf("error signing tx: ", err)
@@ -218,6 +219,19 @@ func (b *BitcoinWallet) Sign(tx *Transaction, utxos []UTXO) {
 
 }
 
-func SendTx(rawtx string) {
+type BitcoinSendResult struct {
+	Hex string `json:"hex"`
+}
+
+func (b *BitcoinWallet) SendTx(rawtx string) (string, error) {
+	bs := BitcoinSendResult{}
+	result := makeResult(&bs)
+	b.RpcPost("sendrawtransaction", []string{rawtx}, &result)
+	if result.Error != nil {
+		log.Printf("Transaction Send Error: %s", result.Error.Message)
+		return "", errors.New(result.Error.Message)
+	}
+
+	return bs.Hex, nil
 
 }

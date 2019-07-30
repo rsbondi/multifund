@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"errors"
-
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/niftynei/glightning/jrpc2"
 	"github.com/rsbondi/multifund/rpc"
 	"github.com/rsbondi/multifund/wallet"
+	"log"
 )
 
 const FundMultiDescription = `Use external wallet funding feature to build a transaction to fund multiple channels
@@ -36,7 +38,7 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 	if rate.Error != nil {
 		return nil, errors.New(rate.Error.Message)
 	}
-	fee := wallet.Satoshis(rate.Result.(*wallet.EstimateSmartFeeResult).Feerate/1000.0) * uint64(150+50*len(*chans)) // crude size calc
+	fee := wallet.Satoshis(rate.Result.(*wallet.EstimateSmartFeeResult).Feerate/1000.0) * uint64(160+70*len(*chans)) // crude size calc
 
 	recipamt := int64(0)
 	for i, c := range *chans {
@@ -69,6 +71,7 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 	for _, u := range utxos {
 		utxoamt += u.Amount
 	}
+	log.Printf("adding change %d %d %d\n", utxoamt, fee, recipamt)
 	recipients = append(recipients, &wallet.TxRecipient{Address: change, Amount: int64(utxoamt-fee) - recipamt})
 	tx, err := wallet.CreateTransaction(recipients, utxos, &chaincfg.RegressionNetParams)
 	if err != nil {
@@ -76,7 +79,25 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 	}
 
 	wally.Sign(&tx, utxos)
+	wtx := wire.NewMsgTx(2)
+	r := bytes.NewReader(tx.Signed)
+	wtx.Deserialize(r)
+	tx.TxId = wtx.TxHash().String()
 
-	return tx.String(), nil
+	for k, o := range outputs {
+		log.Printf("calling fundchannel_complete %s %s %d", k, tx.TxId, o.Vout)
+		_, err := rpc.FundChannelComplete(k, tx.TxId, o.Vout)
+		if err != nil {
+			return nil, err
+		}
+
+	}
+
+	hex, err := bitcoin.SendTx(tx.String())
+	if err != nil {
+		return nil, err
+	}
+
+	return hex, nil
 
 }

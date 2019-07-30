@@ -55,8 +55,6 @@ func CreateTransaction(destinations []*TxRecipient, utxos []UTXO, network *chain
 
 	var unsignedTx bytes.Buffer
 	tx.Serialize(&unsignedTx)
-	transactionHash := tx.TxHash()
-	transaction.TxId = transactionHash.String()
 	transaction.Unsigned = unsignedTx.Bytes()
 	return transaction, nil
 }
