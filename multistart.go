@@ -2,12 +2,14 @@ package main
 
 import (
 	"bytes"
+	"errors"
+	"log"
+
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/niftynei/glightning/jrpc2"
 	"github.com/rsbondi/multifund/rpc"
 	"github.com/rsbondi/multifund/wallet"
-	"log"
 )
 
 const FundMultiDescription = `Use external wallet funding feature to build a transaction to fund multiple channels
@@ -48,16 +50,8 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 	// TODO: get utxos and loop channels to get total to make sure we have enough funds
 
 	recipamt := int64(0)
-	for i, c := range *chans {
-		result, err := rpc.FundChannelStart(c.Id, c.Amount)
-		if err != nil {
-			return nil, err
-		}
-		amt := int64(c.Amount) // difference in wire and glightning
+	for _, c := range *chans {
 		inamt += uint64(c.Amount)
-		outputs[c.Id] = &wallet.Outputs{Vout: i, Amount: amt, Address: result.FundingAddress}
-		recipamt += amt
-		recipients = append(recipients, &wallet.TxRecipient{Address: result.FundingAddress, Amount: amt})
 	}
 
 	var wally wallet.Wallet
@@ -78,6 +72,22 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 	for _, u := range utxos {
 		utxoamt += u.Amount
 	}
+
+	if inamt > utxoamt+fee {
+		return nil, errors.New("Insufficient funds, Need more coin")
+	}
+
+	for i, c := range *chans {
+		result, err := rpc.FundChannelStart(c.Id, c.Amount)
+		if err != nil {
+			return nil, err
+		}
+		amt := int64(c.Amount) // difference in wire and glightning
+		outputs[c.Id] = &wallet.Outputs{Vout: i, Amount: amt, Address: result.FundingAddress}
+		recipamt += amt
+		recipients = append(recipients, &wallet.TxRecipient{Address: result.FundingAddress, Amount: amt})
+	}
+
 	log.Printf("adding change %d %d %d\n", utxoamt, fee, recipamt)
 	recipients = append(recipients, &wallet.TxRecipient{Address: change, Amount: int64(utxoamt-fee) - recipamt})
 	tx, err := wallet.CreateTransaction(recipients, utxos, &chaincfg.RegressionNetParams)
