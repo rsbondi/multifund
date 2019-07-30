@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"errors"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/niftynei/glightning/jrpc2"
@@ -12,7 +11,7 @@ import (
 )
 
 const FundMultiDescription = `Use external wallet funding feature to build a transaction to fund multiple channels
-provide {utxos} as an array of {"txid":vout} and {ids} in the form of {"id":sats, "id2":sats, ..."idn":sats}!`
+{channels} is an array of object{"id" string, "satoshi" int, "announce" bool}`
 
 type MultiChannel struct {
 	Channels []rpc.FundChannelStartRequest
@@ -35,10 +34,18 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 	outputs = make(map[string]*wallet.Outputs, 0)
 	inamt := uint64(0)
 	rate := bitcoin.EstimateSmartFee(100)
-	if rate.Error != nil {
-		return nil, errors.New(rate.Error.Message)
+	kb := uint64(160 + 70*len(*chans)) // crude size calc
+	feerate := rate.Result.(*wallet.EstimateSmartFeeResult).Feerate / 1000.0
+
+	var fee uint64
+	if feerate == 0.0 {
+		log.Println("unable to estimate fee rate, using default")
+		fee = 2 * kb
+	} else {
+		fee = wallet.Satoshis(feerate) * kb
 	}
-	fee := wallet.Satoshis(rate.Result.(*wallet.EstimateSmartFeeResult).Feerate/1000.0) * uint64(160+70*len(*chans)) // crude size calc
+
+	// TODO: get utxos and loop channels to get total to make sure we have enough funds
 
 	recipamt := int64(0)
 	for i, c := range *chans {
@@ -93,11 +100,11 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 
 	}
 
-	hex, err := bitcoin.SendTx(tx.String())
+	txid, err := bitcoin.SendTx(tx.String())
 	if err != nil {
 		return nil, err
 	}
 
-	return hex, nil
+	return txid, nil
 
 }

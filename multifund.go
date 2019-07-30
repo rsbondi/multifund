@@ -60,7 +60,7 @@ func registerOptions(p *glightning.Plugin) {
 func registerMethods(p *glightning.Plugin) {
 	multi := glightning.NewRpcMethod(&MultiChannel{}, `Open multiple channels in single transaction`)
 	multi.LongDesc = FundMultiDescription
-	multi.Usage = "utxos ids"
+	multi.Usage = "channels"
 	p.RegisterMethod(multi)
 
 	multic := glightning.NewRpcMethod(&MultiChannelComplete{}, `Finalizes multiple channels from single transaction`)

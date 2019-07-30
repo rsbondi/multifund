@@ -148,7 +148,6 @@ func (b *BitcoinWallet) ChangeAddress() string {
 }
 
 type RpcError struct {
-	Code    int    `json:"code"`
 	Message string `json:"message"`
 }
 
@@ -224,7 +223,7 @@ type BitcoinSendResult struct {
 }
 
 func (b *BitcoinWallet) SendTx(rawtx string) (string, error) {
-	bs := BitcoinSendResult{}
+	bs := ""
 	result := makeResult(&bs)
 	b.RpcPost("sendrawtransaction", []string{rawtx}, &result)
 	if result.Error != nil {
@@ -232,6 +231,6 @@ func (b *BitcoinWallet) SendTx(rawtx string) (string, error) {
 		return "", errors.New(result.Error.Message)
 	}
 
-	return bs.Hex, nil
+	return bs, nil
 
 }
