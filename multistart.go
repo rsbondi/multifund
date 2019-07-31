@@ -79,6 +79,7 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 	for i, c := range *chans {
 		result, err := rpc.FundChannelStart(c.Id, c.Amount)
 		if err != nil {
+			cancelMulti(outputs)
 			return nil, err
 		}
 		amt := int64(c.Amount) // difference in wire and glightning
@@ -104,6 +105,7 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 		log.Printf("calling fundchannel_complete %s %s %d", k, tx.TxId, o.Vout)
 		_, err := rpc.FundChannelComplete(k, tx.TxId, o.Vout)
 		if err != nil {
+			cancelMulti(outputs)
 			return nil, err
 		}
 
@@ -111,9 +113,21 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 
 	txid, err := bitcoin.SendTx(tx.String())
 	if err != nil {
+		cancelMulti(outputs)
 		return nil, err
 	}
 
 	return txid, nil
+
+}
+
+func cancelMulti(outputs map[string]*wallet.Outputs) {
+	for k, _ := range outputs {
+		_, err := rpc.FundChannelCancel(k)
+		if err != nil {
+			log.Printf("fundchannel_cancel error: %s", err.Error())
+		}
+
+	}
 
 }

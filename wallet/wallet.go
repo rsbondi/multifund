@@ -40,6 +40,6 @@ func reverseBytes(b []byte) []byte {
 	return newbytes
 }
 
-func Satoshis(btc float32) uint64 {
-	return uint64(btc * float32(100000000))
+func Satoshis(btc float64) uint64 {
+	return uint64(btc * float64(100000000))
 }

@@ -62,7 +62,7 @@ func NewBitcoinWallet() *BitcoinWallet {
 type bitcoinUtxo struct {
 	Txid          string  `json:"txid"`
 	Vout          uint32  `json:"vout"`
-	Amount        float32 `json:"amount"`
+	Amount        float64 `json:"amount"`
 	Address       string  `json:"address"`
 	ScriptPubKey  string  `json:"scriptPubKey"`
 	RedeemScript  string  `json:"redeemScript"`
@@ -153,7 +153,7 @@ func (b *BitcoinWallet) Utxos(amt uint64, fee uint64) ([]UTXO, error) {
 }
 
 type EstimateSmartFeeResult struct {
-	Feerate float32 `json:"feerate"`
+	Feerate float64 `json:"feerate"`
 }
 
 func (b *BitcoinWallet) EstimateSmartFee(target uint) RpcResult {
@@ -188,7 +188,6 @@ type RpcCall struct {
 }
 
 func (b *BitcoinWallet) RpcPost(method string, params interface{}, result interface{}) error {
-	log.Printf("posting to bitcoin rpc %s %v", method, params)
 	url := fmt.Sprintf("http://%s:%s", b.rpchost, b.rpcport)
 	rpcCall := &RpcCall{
 		Id:      time.Now().Unix(),

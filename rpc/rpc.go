@@ -62,6 +62,26 @@ func FundChannelComplete(id string, txid string, vout int) (*FundChannelComplete
 	return result, err
 }
 
+type FundChannelCancelRequest struct {
+	Id string `json:"id"`
+}
+
+func (f *FundChannelCancelRequest) Name() string {
+	return "fundchannel_cancel"
+}
+
+type FundChannelCancelResponse struct {
+	Cancelled string `json:"cancelled"`
+}
+
+func FundChannelCancel(id string) (*FundChannelCancelResponse, error) {
+	result := &FundChannelCancelResponse{}
+	req := &FundChannelCompleteRequest{}
+	req.Id = id
+	err := lightning.Request(req, result)
+	return result, err
+}
+
 type ListConfigsRequest struct{}
 
 func (c *ListConfigsRequest) Name() string {
