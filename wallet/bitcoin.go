@@ -47,6 +47,10 @@ func NewBitcoinWallet() *BitcoinWallet {
 		// TODO: get from ~/.bitcoin/bitcoin.conf
 	}
 
+	if host == "" || port == "" || user == "" || pass == "" {
+		panic("can not initialize bitcoin wallet, configuration information not found, try adding to your lightning config")
+	}
+
 	return &BitcoinWallet{
 		rpchost:     host,
 		rpcport:     port,
@@ -76,7 +80,7 @@ func makeResult(r interface{}) RpcResult {
 	return result
 }
 
-type ByMsat []*bitcoinUtxo
+type ByMsat []bitcoinUtxo
 
 func (a ByMsat) Len() int           { return len(a) }
 func (a ByMsat) Less(i, j int) bool { return a[i].Amount < a[j].Amount }
@@ -88,9 +92,12 @@ func (b *BitcoinWallet) Utxos(amt uint64, fee uint64) ([]UTXO, error) {
 	result := makeResult(&unspent)
 	b.RpcPost("listunspent", []empty{}, &result)
 	dust := uint64(1000)
+	sort.Sort(ByMsat(unspent))
 	candidates := make([]*bitcoinUtxo, 0)
 	for _, u := range unspent {
 		sats := Satoshis(u.Amount)
+
+		// best case, but least likely, no change needed
 		if sats == amt+fee && u.Confirmations > minconf {
 			txid, err := hex.DecodeString(u.Txid)
 			if err != nil {
@@ -107,10 +114,21 @@ func (b *BitcoinWallet) Utxos(amt uint64, fee uint64) ([]UTXO, error) {
 		}
 	}
 	if len(candidates) == 0 {
-		return nil, errors.New("no utxo candidates available") // TODO: try multiple
+		// unspent is sorted so grabbing the largest first should give us the least input count to tx
+		sats := uint64(0)
+		for i := len(unspent); i >= 0; i-- {
+			u := unspent[i]
+			sats += Satoshis(u.Amount)
+			candidates = append(candidates, &unspent[i])
+			if sats > amt+fee+dust && u.Confirmations > minconf {
+				break
+			}
+		}
+	}
+	if len(candidates) == 0 {
+		return nil, errors.New("no utxo candidates available")
 	}
 
-	sort.Sort(ByMsat(candidates))
 	c := candidates[0]
 	txid, err := hex.DecodeString(c.Txid)
 	if err != nil {
@@ -120,7 +138,7 @@ func (b *BitcoinWallet) Utxos(amt uint64, fee uint64) ([]UTXO, error) {
 	h, err := chainhash.NewHash(reverseBytes(txid))
 	if err != nil {
 		log.Printf("unable to create hash from txid %s\n", err)
-
+		return nil, err
 	}
 	o := wire.NewOutPoint(h, c.Vout)
 
@@ -164,7 +182,6 @@ type RpcCall struct {
 }
 
 func (b *BitcoinWallet) RpcPost(method string, params interface{}, result interface{}) error {
-	// TODO: send error if not properly initialized with host and port
 	url := fmt.Sprintf("http://%s:%s", b.rpchost, b.rpcport)
 	rpcCall := &RpcCall{
 		Id:      time.Now().Unix(),

@@ -34,7 +34,7 @@ func (f *MultiChannel) New() interface{} {
 func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 	var recipients = make([]*wallet.TxRecipient, 0)
 	outputs = make(map[string]*wallet.Outputs, 0)
-	inamt := uint64(0)
+	outamt := uint64(0)
 	rate := bitcoin.EstimateSmartFee(100)
 	kb := uint64(160 + 70*len(*chans)) // crude size calc
 	feerate := rate.Result.(*wallet.EstimateSmartFeeResult).Feerate / 1000.0
@@ -47,13 +47,12 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 		fee = wallet.Satoshis(feerate) * kb
 	}
 
-	// TODO: get utxos and loop channels to get total to make sure we have enough funds
-
 	recipamt := int64(0)
 	for _, c := range *chans {
-		inamt += uint64(c.Amount)
+		outamt += uint64(c.Amount)
 	}
 
+	// TODO: need a way to register wallets so additional plugins could add additional wallet types
 	var wally wallet.Wallet
 	switch wallettype {
 	case wallet.WALLET_BITCOIN:
@@ -67,13 +66,13 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 	}
 	wally = bitcoin // TODO
 	change := wally.ChangeAddress()
-	utxos, err := wally.Utxos(inamt, fee)
+	utxos, err := wally.Utxos(outamt, fee)
 	utxoamt := uint64(0)
 	for _, u := range utxos {
 		utxoamt += u.Amount
 	}
 
-	if inamt > utxoamt+fee {
+	if outamt > utxoamt+fee {
 		return nil, errors.New("Insufficient funds, Need more coin")
 	}
 
