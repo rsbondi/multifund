@@ -12,13 +12,17 @@ const (
 
 type Wallet interface {
 
-	// GetUtxos will provide utxos(wire.OutPoint) for the wallet implementation based on the amount
+	// Utxos will provide utxos(wire.OutPoint) for the wallet implementation based on the amount
 	// amt is the amount of the transaction used to determine what utxos to use to cover the amount plus fees
 	Utxos(amt uint64, fee uint64) ([]UTXO, error)
 
-	// GetChangeAddress provides where to send the change
+	// ChangeAddress provides where to send the change
 	ChangeAddress() string
 
+	// Sign uses the wallet implementation to provide signatures so a transaction can be broadcast
+	// tx is the transaction to be sighned
+	// utxos provides the transaction inputs that need signing, from this it should be able to locate
+	//   the private keys
 	Sign(tx *Transaction, utxos []UTXO)
 }
 

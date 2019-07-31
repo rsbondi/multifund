@@ -80,11 +80,11 @@ func makeResult(r interface{}) RpcResult {
 	return result
 }
 
-type ByMsat []bitcoinUtxo
+type ByAmount []bitcoinUtxo
 
-func (a ByMsat) Len() int           { return len(a) }
-func (a ByMsat) Less(i, j int) bool { return a[i].Amount < a[j].Amount }
-func (a ByMsat) Swap(i, j int)      { a[i].Amount, a[j].Amount = a[j].Amount, a[i].Amount }
+func (a ByAmount) Len() int           { return len(a) }
+func (a ByAmount) Less(i, j int) bool { return a[i].Amount < a[j].Amount }
+func (a ByAmount) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 
 func (b *BitcoinWallet) Utxos(amt uint64, fee uint64) ([]UTXO, error) {
 	minconf := uint(3)
@@ -92,7 +92,7 @@ func (b *BitcoinWallet) Utxos(amt uint64, fee uint64) ([]UTXO, error) {
 	result := makeResult(&unspent)
 	b.RpcPost("listunspent", []empty{}, &result)
 	dust := uint64(1000)
-	sort.Sort(ByMsat(unspent))
+	sort.Sort(ByAmount(unspent))
 	candidates := make([]*bitcoinUtxo, 0)
 	for _, u := range unspent {
 		sats := Satoshis(u.Amount)
@@ -111,6 +111,8 @@ func (b *BitcoinWallet) Utxos(amt uint64, fee uint64) ([]UTXO, error) {
 		}
 		if sats > amt+fee+dust && u.Confirmations > minconf {
 			candidates = append(candidates, &u)
+			log.Printf("single utxo candidate found: %f %s\n", u.Amount, u.Txid)
+			break
 		}
 	}
 	if len(candidates) == 0 {
@@ -129,20 +131,24 @@ func (b *BitcoinWallet) Utxos(amt uint64, fee uint64) ([]UTXO, error) {
 		return nil, errors.New("no utxo candidates available")
 	}
 
-	c := candidates[0]
-	txid, err := hex.DecodeString(c.Txid)
-	if err != nil {
-		log.Printf("unable to decode txid %s\n", err)
+	utxos := make([]UTXO, 0)
+	for _, c := range candidates {
+		log.Printf("single add utxo: %f %s\n", c.Amount, c.Txid)
+		txid, err := hex.DecodeString(c.Txid)
+		if err != nil {
+			log.Printf("unable to decode txid %s\n", err)
 
-	}
-	h, err := chainhash.NewHash(reverseBytes(txid))
-	if err != nil {
-		log.Printf("unable to create hash from txid %s\n", err)
-		return nil, err
-	}
-	o := wire.NewOutPoint(h, c.Vout)
+		}
+		h, err := chainhash.NewHash(reverseBytes(txid))
+		if err != nil {
+			log.Printf("unable to create hash from txid %s\n", err)
+			return nil, err
+		}
 
-	utxos := []UTXO{UTXO{Satoshis(c.Amount), c.Address, *o}}
+		o := wire.NewOutPoint(h, c.Vout)
+
+		utxos = append(utxos, UTXO{Satoshis(c.Amount), c.Address, *o})
+	}
 	return utxos, nil
 }
 
@@ -182,6 +188,7 @@ type RpcCall struct {
 }
 
 func (b *BitcoinWallet) RpcPost(method string, params interface{}, result interface{}) error {
+	log.Printf("posting to bitcoin rpc %s %v", method, params)
 	url := fmt.Sprintf("http://%s:%s", b.rpchost, b.rpcport)
 	rpcCall := &RpcCall{
 		Id:      time.Now().Unix(),
