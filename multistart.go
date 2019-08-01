@@ -31,9 +31,53 @@ func (f *MultiChannel) New() interface{} {
 	return &MultiChannel{}
 }
 
+type ConnectAndFundChannelRequest struct {
+	Id       string  `json:"id"`
+	Host     string  `json:"host"`
+	Port     float64 `json:"port"`
+	Amount   float64 `json:"satoshi"`
+	FeeRate  string  `json:"feerate,omitempty"`
+	Announce bool    `json:"announce"`
+}
+
+type MultiChannelWithConnect struct {
+	Channels []ConnectAndFundChannelRequest
+}
+
+func (m *MultiChannelWithConnect) Call() (jrpc2.Result, error) {
+	return connectAndCreateMulti(&m.Channels)
+}
+
+func (f *MultiChannelWithConnect) Name() string {
+	return "connect_fund_multi"
+}
+
+func (f *MultiChannelWithConnect) New() interface{} {
+	return &MultiChannelWithConnect{}
+}
+
+func connectAndCreateMulti(chans *[]ConnectAndFundChannelRequest) (jrpc2.Result, error) {
+	createChans := make([]rpc.FundChannelStartRequest, 0)
+	for _, c := range *chans {
+		_, err := lightning.Connect(c.Id, c.Host, uint(c.Port))
+		if err != nil {
+			return nil, err
+		}
+		newone := rpc.FundChannelStartRequest{
+			Id:       c.Id,
+			Amount:   c.Amount,
+			FeeRate:  c.FeeRate,
+			Announce: c.Announce,
+		}
+		createChans = append(createChans, newone)
+	}
+
+	return createMulti(&createChans)
+}
+
 func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 	var recipients = make([]*wallet.TxRecipient, 0)
-	outputs = make(map[string]*wallet.Outputs, 0)
+	outputs := make(map[string]*wallet.Outputs, 0)
 	outamt := uint64(0)
 	rate := bitcoin.EstimateSmartFee(100)
 	kb := uint64(160 + 70*len(*chans)) // crude size calc

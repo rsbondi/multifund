@@ -17,11 +17,6 @@ var lightning *glightning.Lightning
 var wallettype int
 var bitcoin *wallet.BitcoinWallet // we always use this at least for broadcasting the tx
 
-// TODO: not sure if to keep this global and restrict to one call at a time,
-//   could check for zero length to limit
-//   the other option would be to keep it local and as a return value
-var outputs map[string]*wallet.Outputs // hold node id to the vout position in the funding tx
-
 func main() {
 	plugin = glightning.NewPlugin(onInit)
 	lightning = glightning.NewLightning()
@@ -63,9 +58,9 @@ func registerMethods(p *glightning.Plugin) {
 	multi.Usage = "channels"
 	p.RegisterMethod(multi)
 
-	multic := glightning.NewRpcMethod(&MultiChannelComplete{}, `Finalizes multiple channels from single transaction`)
-	multic.LongDesc = FundMultiCompleteDescription
-	multic.Usage = "transactions"
+	multic := glightning.NewRpcMethod(&MultiChannelWithConnect{}, `Connects peers and opens multiple channels in single transactio`)
+	multic.LongDesc = "{peers} consist of {id, host, port, satoshi, announce}"
+	multic.Usage = "peers"
 	p.RegisterMethod(multic)
 
 }
