@@ -230,7 +230,7 @@ func (b *BitcoinWallet) Sign(tx *Transaction, utxos []UTXO) {
 
 	signed, err := hex.DecodeString(raw.Hex)
 	if err != nil {
-		log.Printf("error signing tx: ", err)
+		log.Printf("error signing tx: %s", err.Error())
 
 		return
 	}

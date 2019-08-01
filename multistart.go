@@ -33,8 +33,8 @@ func (f *MultiChannel) New() interface{} {
 
 type ConnectAndFundChannelRequest struct {
 	Id       string  `json:"id"`
-	Host     string  `json:"host"`
-	Port     float64 `json:"port"`
+	Host     string  `json:"host,omitempty"`
+	Port     float64 `json:"port,omitempty"`
 	Amount   float64 `json:"satoshi"`
 	FeeRate  string  `json:"feerate,omitempty"`
 	Announce bool    `json:"announce"`

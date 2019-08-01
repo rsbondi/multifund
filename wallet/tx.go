@@ -46,9 +46,9 @@ func CreateTransaction(destinations []*TxRecipient, utxos []UTXO, network *chain
 	}
 
 	for _, destination := range destinations {
-		log.Printf("destination address: %s\n", destination.Address)
 		destinationAddress, err := btcutil.DecodeAddress(destination.Address, network)
 		if err != nil {
+			log.Printf("unable to decode address: %s\n", err.Error())
 			return Transaction{}, err
 		}
 		destinationPkScript, _ := txscript.PayToAddrScript(destinationAddress)
