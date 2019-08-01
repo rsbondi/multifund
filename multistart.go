@@ -88,7 +88,6 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 		recipients = append(recipients, &wallet.TxRecipient{Address: result.FundingAddress, Amount: amt})
 	}
 
-	log.Printf("adding change %d %d %d\n", utxoamt, fee, recipamt)
 	recipients = append(recipients, &wallet.TxRecipient{Address: change, Amount: int64(utxoamt-fee) - recipamt})
 	tx, err := wallet.CreateTransaction(recipients, utxos, &chaincfg.RegressionNetParams)
 	if err != nil {
@@ -102,7 +101,6 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 	tx.TxId = wtx.TxHash().String()
 
 	for k, o := range outputs {
-		log.Printf("calling fundchannel_complete %s %s %d", k, tx.TxId, o.Vout)
 		_, err := rpc.FundChannelComplete(k, tx.TxId, o.Vout)
 		if err != nil {
 			cancelMulti(outputs)

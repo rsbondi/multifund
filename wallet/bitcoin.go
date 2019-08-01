@@ -111,7 +111,6 @@ func (b *BitcoinWallet) Utxos(amt uint64, fee uint64) ([]UTXO, error) {
 		}
 		if sats > amt+fee+dust && u.Confirmations > minconf {
 			candidates = append(candidates, &u)
-			log.Printf("single utxo candidate found: %f %s\n", u.Amount, u.Txid)
 			break
 		}
 	}
@@ -133,7 +132,6 @@ func (b *BitcoinWallet) Utxos(amt uint64, fee uint64) ([]UTXO, error) {
 
 	utxos := make([]UTXO, 0)
 	for _, c := range candidates {
-		log.Printf("single add utxo: %f %s\n", c.Amount, c.Txid)
 		txid, err := hex.DecodeString(c.Txid)
 		if err != nil {
 			log.Printf("unable to decode txid %s\n", err)
@@ -167,7 +165,7 @@ func (b *BitcoinWallet) EstimateSmartFee(target uint) RpcResult {
 func (b *BitcoinWallet) ChangeAddress() string {
 	addr := ""
 	result := makeResult(&addr)
-	b.RpcPost("getnewaddress", []string{"", "bech32"}, &result)
+	b.RpcPost("getrawchangeaddress", []string{"bech32"}, &result)
 	return addr
 }
 
@@ -225,12 +223,11 @@ func (b *BitcoinWallet) Sign(tx *Transaction, utxos []UTXO) {
 		pks = append(pks, key)
 
 	}
-	log.Printf("unsigned: %s", tx.String())
 
 	raw := BitcoinSignResult{}
 	rawresult := makeResult(&raw)
 	b.RpcPost("signrawtransactionwithkey", []interface{}{tx.String(), pks}, &rawresult)
-	log.Printf("signed: %s", raw.Hex)
+
 	signed, err := hex.DecodeString(raw.Hex)
 	if err != nil {
 		log.Printf("error signing tx: ", err)

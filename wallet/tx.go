@@ -3,6 +3,7 @@ package wallet
 import (
 	"bytes"
 	"encoding/hex"
+	"log"
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/txscript"
@@ -45,6 +46,7 @@ func CreateTransaction(destinations []*TxRecipient, utxos []UTXO, network *chain
 	}
 
 	for _, destination := range destinations {
+		log.Printf("destination address: %s\n", destination.Address)
 		destinationAddress, err := btcutil.DecodeAddress(destination.Address, network)
 		if err != nil {
 			return Transaction{}, err
