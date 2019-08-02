@@ -1,4 +1,4 @@
-WIP - nothing here, move along
+WIP - Not ready for prime time
 
 ### what
 
@@ -9,15 +9,25 @@ This is the start of a multi channel funding plugin for c-lightning
 New release allows opening of multiple channels with a single transaction.
 This is an attempt to make it less painful
 
-### objective
+### status
 
-The plan is to create this plugin to work either with the internal wallet,
-the bitcoin core wallet or with an external wallet.
+Currently there are 2 new RPC commands
 
-The internal wallet if used will use the c-lightning internal wallet to to provide needed utxos and change address for creating the transaction, use the c-lightning `fundchannel_start` and `fundchannel_complete` commands to get an address for each channel to provide to the transaction.
+`fund_multi` and `connect_fund_multi`
 
-If the bitcoin core options is selected, the bitcoin core node will provide utxos and change address and continue as above
+`fund_multi [{"id": "02fc...", "satoshi": 20000, "announce", true}, {...}, ...]`
 
-For external wallet, rpc methods will be added for providing utxo and change address info and one for sending when completed and signed by external wallet
+`connect_fund_multi` adds `"host"` and `"port"` parameters to the above
 
-Use connected bitcoin core node for broadcasting the transactions
+Using bitcoin core node as the wallet type works seems to be working
+
+You must launch lightningd with the `bitcoin-xxx` either in the config file or command line.  It will eventually read them from the `bitcoin.conf` file.  The bitcoin core node is used for broadcasting transactions so it must be accessible even if you use clightning internal wallet.
+
+TODO:
+* Use internal clightning wallet
+  * need to get signing working, utxo and change address is complete
+* Read from  `bitcoin.conf`
+* Implement wallet option, currently hard coded
+* Read lightning config for internal wallet, currently hard coded to default location
+
+[demo video](https://www.youtube.com/watch?v=exDYLpTncng&feature=youtu.be)
