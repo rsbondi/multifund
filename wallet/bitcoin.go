@@ -91,7 +91,6 @@ func (b *BitcoinWallet) Utxos(amt uint64, fee uint64) ([]UTXO, error) {
 	unspent := make([]bitcoinUtxo, 0)
 	result := makeResult(&unspent)
 	b.RpcPost("listunspent", []empty{}, &result)
-	dust := uint64(1000)
 	sort.Sort(ByAmount(unspent))
 	candidates := make([]*bitcoinUtxo, 0)
 	for _, u := range unspent {
@@ -109,7 +108,7 @@ func (b *BitcoinWallet) Utxos(amt uint64, fee uint64) ([]UTXO, error) {
 			utxos := []UTXO{UTXO{Satoshis(u.Amount), u.Address, *o}}
 			return utxos, nil
 		}
-		if sats > amt+fee+dust && u.Confirmations > minconf {
+		if sats > amt+fee+DUST_LIMIT && u.Confirmations > minconf {
 			candidates = append(candidates, &u)
 			break
 		}
@@ -117,11 +116,11 @@ func (b *BitcoinWallet) Utxos(amt uint64, fee uint64) ([]UTXO, error) {
 	if len(candidates) == 0 {
 		// unspent is sorted so grabbing the largest first should give us the least input count to tx
 		sats := uint64(0)
-		for i := len(unspent); i >= 0; i-- {
+		for i := len(unspent) - 1; i >= 0; i-- {
 			u := unspent[i]
 			sats += Satoshis(u.Amount)
 			candidates = append(candidates, &unspent[i])
-			if sats > amt+fee+dust && u.Confirmations > minconf {
+			if sats > amt+fee+DUST_LIMIT && u.Confirmations > minconf {
 				break
 			}
 		}

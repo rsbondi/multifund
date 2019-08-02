@@ -108,7 +108,7 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 		return resp, nil
 
 	}
-	wally = bitcoin // TODO
+	wally = wallet.NewInternalWallet(lightning, &chaincfg.RegressionNetParams) // TODO
 	change := wally.ChangeAddress()
 	utxos, err := wally.Utxos(outamt, fee)
 	utxoamt := uint64(0)

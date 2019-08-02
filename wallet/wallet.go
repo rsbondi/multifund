@@ -10,6 +10,8 @@ const (
 	WALLET_INTERNAL
 )
 
+const DUST_LIMIT = uint64(1000)
+
 type Wallet interface {
 
 	// Utxos will provide utxos(wire.OutPoint) for the wallet implementation based on the amount
