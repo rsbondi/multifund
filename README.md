@@ -27,7 +27,5 @@ TODO:
 * Internal wallet working but must be bech32 inputs being spent
     * need to check input type and sign appropriately
 * Read from  `bitcoin.conf`
-* Implement wallet option, currently hard coded
-* Read lightning config for internal wallet, currently hard coded to default location
 
 [demo video](https://www.youtube.com/watch?v=exDYLpTncng&feature=youtu.be)

@@ -9,7 +9,6 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"log"
 	"os"
-	"os/user"
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -28,13 +27,8 @@ type InternalWallet struct {
 	dir       string
 }
 
-func NewInternalWallet(l *glightning.Lightning, net *chaincfg.Params) *InternalWallet {
-	usr, err := user.Current()
-	if err != nil {
-		panic(err)
-	}
-
-	f, err := os.Open(usr.HomeDir + "/.lightning/hsm_secret") // TODO: listconfigs
+func NewInternalWallet(l *glightning.Lightning, net *chaincfg.Params, dir string) *InternalWallet {
+	f, err := os.Open(dir + "/hsm_secret")
 	if err != nil {
 		panic(err)
 	}
@@ -59,7 +53,7 @@ func NewInternalWallet(l *glightning.Lightning, net *chaincfg.Params) *InternalW
 		lightning: l,
 		master:    master,
 		net:       net,
-		dir:       usr.HomeDir + "/.lightning", // TODO
+		dir:       dir,
 	}
 }
 
@@ -88,25 +82,21 @@ func (i *InternalWallet) Utxos(amt uint64, fee uint64) ([]UTXO, error) {
 	unspent := make([]Outs, 0)
 	candidates := make([]*Outs, 0)
 
-	cols, _ := rows.Columns()
-	log.Printf("query columns: %s\n", cols)
-
 	for rows.Next() {
 		u := Outs{}
 		err = rows.Scan(&u.PrevOutTx, &u.PrevOutIndex, &u.Value, &u.Scriptpubkey)
-		log.Printf("row: %v\n", u)
 		if err != nil {
 			log.Printf("cannot read database row: %s", err.Error())
 		}
 		unspent = append(unspent, u)
 		sats := uint64(u.Value)
-		if sats == amt+fee {
+		if sats >= amt+fee && sats <= amt+fee+DUST_LIMIT {
 			txid := u.PrevOutTx
 			if err != nil {
 				log.Printf("unable to decode txid %s\n", err)
 
 			}
-			h, _ := chainhash.NewHash(reverseBytes(txid))
+			h, _ := chainhash.NewHash(txid)
 			o := wire.NewOutPoint(h, uint32(u.PrevOutIndex))
 			utxos := []UTXO{UTXO{uint64(u.Value), "", *o}}
 			return utxos, nil
@@ -166,7 +156,6 @@ func (i *InternalWallet) ChangeAddress() string {
 
 func (i *InternalWallet) Sign(tx *Transaction, utxos []UTXO) {
 	partial := tx.Unsigned
-	log.Printf("unsigned: %x", partial)
 
 	dbpath := i.dir + "/lightningd.sqlite3"
 	db, err := sql.Open("sqlite3", dbpath)
@@ -181,22 +170,18 @@ func (i *InternalWallet) Sign(tx *Transaction, utxos []UTXO) {
 
 		rawtx := make([]byte, 0)
 		txhash := fmt.Sprintf("%x", u.OutPoint.Hash.CloneBytes())
-		log.Printf("txhash for transaction: %s", txhash)
 		err = db.QueryRow("SELECT rawtx FROM transactions WHERE HEX(id)=? COLLATE NOCASE", txhash).Scan(&rawtx)
 
 		if err != nil {
 			log.Printf("cannot scan row: %s", err.Error())
 		}
-		log.Printf("row: %s %x\n", u.OutPoint.Hash.String(), rawtx)
 		prevtx, err := btcutil.NewTxFromBytes(rawtx)
 		prevmsgtx := prevtx.MsgTx()
 
 		keyindex := uint32(0)
-		log.Printf("selecting output %s %d", txhash, u.OutPoint.Index)
 		err = db.QueryRow("SELECT keyindex FROM outputs WHERE HEX(prev_out_tx)=? COLLATE NOCASE and prev_out_index=?",
 			txhash, u.OutPoint.Index).Scan(&keyindex)
 
-		log.Printf("row: %d\n", keyindex)
 		if err != nil {
 			log.Printf("cannot read database row: %s", err.Error())
 		}
@@ -211,18 +196,15 @@ func (i *InternalWallet) Sign(tx *Transaction, utxos []UTXO) {
 			log.Printf("cannot create sig script: %s", err.Error())
 		}
 		txToSign.TxIn[n].Witness = sigScript
-		log.Printf("sig script: %x", sigScript)
 
 		var txsig bytes.Buffer
 		if err != nil {
 			log.Printf("cannot sign: %s", err.Error())
 		}
 		err = txToSign.Serialize(&txsig)
-		log.Printf("sig: %x", txsig.Bytes())
 
 		partial = txsig.Bytes()
 	}
-	log.Printf("fully signed: %x", partial)
 	tx.Signed = partial
 
 }

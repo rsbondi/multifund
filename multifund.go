@@ -18,6 +18,7 @@ var lightning *glightning.Lightning
 var wallettype int
 var bitcoin *wallet.BitcoinWallet // we always use this at least for broadcasting the tx
 var bitcoinNet *chaincfg.Params
+var lightningdir string
 
 func main() {
 	plugin = glightning.NewPlugin(onInit)
@@ -35,6 +36,7 @@ func main() {
 
 func onInit(plugin *glightning.Plugin, options map[string]string, config *glightning.Config) {
 	log.Printf("versiion: %s initialized for wallet type %s", VERSION, options["multi-wallet"])
+	lightningdir = config.LightningDir
 	options["rpc-file"] = fmt.Sprintf("%s/%s", config.LightningDir, config.RpcFile)
 	switch options["multi-wallet"] {
 	case "bitcoin":

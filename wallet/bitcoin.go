@@ -97,7 +97,7 @@ func (b *BitcoinWallet) Utxos(amt uint64, fee uint64) ([]UTXO, error) {
 		sats := Satoshis(u.Amount)
 
 		// best case, but least likely, no change needed
-		if sats == amt+fee && u.Confirmations > minconf {
+		if sats >= amt+fee && sats <= amt+fee+DUST_LIMIT && u.Confirmations > minconf {
 			txid, err := hex.DecodeString(u.Txid)
 			if err != nil {
 				log.Printf("unable to decode txid %s\n", err)

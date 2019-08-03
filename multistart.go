@@ -101,7 +101,7 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 	case wallet.WALLET_BITCOIN:
 		wally = bitcoin
 	case wallet.WALLET_INTERNAL:
-		wallet.NewInternalWallet(lightning, bitcoinNet)
+		wallet.NewInternalWallet(lightning, bitcoinNet, lightningdir)
 	case wallet.WALLET_EXTERNAL:
 		resp := &outputs
 		return resp, nil
@@ -130,7 +130,9 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 		recipients = append(recipients, &wallet.TxRecipient{Address: result.FundingAddress, Amount: amt})
 	}
 
-	recipients = append(recipients, &wallet.TxRecipient{Address: change, Amount: int64(utxoamt-fee) - recipamt})
+	if utxoamt-fee > wallet.DUST_LIMIT { // no change if dust, save on tx fee
+		recipients = append(recipients, &wallet.TxRecipient{Address: change, Amount: int64(utxoamt-fee) - recipamt})
+	}
 	tx, err := wallet.CreateTransaction(recipients, utxos, bitcoinNet)
 	if err != nil {
 		return nil, err
