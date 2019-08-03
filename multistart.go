@@ -43,6 +43,8 @@ type MultiChannelWithConnect struct {
 	Channels []ConnectAndFundChannelRequest
 }
 
+var wally wallet.Wallet
+
 func (m *MultiChannelWithConnect) Call() (jrpc2.Result, error) {
 	return connectAndCreateMulti(&m.Channels)
 }
@@ -96,17 +98,19 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 	}
 
 	// TODO: need a way to register wallets so additional plugins could add additional wallet types
-	var wally wallet.Wallet
-	switch wallettype {
-	case wallet.WALLET_BITCOIN:
-		wally = bitcoin
-	case wallet.WALLET_INTERNAL:
-		wally = wallet.NewInternalWallet(lightning, bitcoinNet, lightningdir)
-	case wallet.WALLET_EXTERNAL:
-		resp := &outputs
-		return resp, nil
+	if wally == nil {
+		switch wallettype {
+		case wallet.WALLET_BITCOIN:
+			wally = bitcoin
+		case wallet.WALLET_INTERNAL:
+			wally = wallet.NewInternalWallet(lightning, bitcoinNet, lightningdir)
+		case wallet.WALLET_EXTERNAL:
+			resp := &outputs
+			return resp, nil
 
+		}
 	}
+
 	change := wally.ChangeAddress()
 	utxos, err := wally.Utxos(outamt, fee)
 	utxoamt := uint64(0)
