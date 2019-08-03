@@ -101,7 +101,7 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 	case wallet.WALLET_BITCOIN:
 		wally = bitcoin
 	case wallet.WALLET_INTERNAL:
-		wallet.NewInternalWallet(lightning, bitcoinNet, lightningdir)
+		wally = wallet.NewInternalWallet(lightning, bitcoinNet, lightningdir)
 	case wallet.WALLET_EXTERNAL:
 		resp := &outputs
 		return resp, nil
@@ -147,7 +147,7 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 	for k, o := range outputs {
 		_, err := rpc.FundChannelComplete(k, tx.TxId, o.Vout)
 		if err != nil {
-			cancelMulti(outputs)
+			closeMulti(outputs)
 			return nil, err
 		}
 
@@ -155,7 +155,7 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 
 	txid, err := bitcoin.SendTx(tx.String())
 	if err != nil {
-		cancelMulti(outputs)
+		closeMulti(outputs)
 		return nil, err
 	}
 
@@ -169,7 +169,14 @@ func cancelMulti(outputs map[string]*wallet.Outputs) {
 		if err != nil {
 			log.Printf("fundchannel_cancel error: %s", err.Error())
 		}
-
 	}
+}
 
+func closeMulti(outputs map[string]*wallet.Outputs) {
+	for k, _ := range outputs {
+		_, err := lightning.CloseNormal(k)
+		if err != nil {
+			log.Printf("fundchannel_cancel error: %s", err.Error())
+		}
+	}
 }
