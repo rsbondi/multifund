@@ -5,7 +5,6 @@ import (
 	"errors"
 	"log"
 
-	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/niftynei/glightning/jrpc2"
 	"github.com/rsbondi/multifund/rpc"
@@ -101,14 +100,13 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 	switch wallettype {
 	case wallet.WALLET_BITCOIN:
 		wally = bitcoin
-
 	case wallet.WALLET_INTERNAL:
+		wallet.NewInternalWallet(lightning, bitcoinNet)
 	case wallet.WALLET_EXTERNAL:
 		resp := &outputs
 		return resp, nil
 
 	}
-	wally = wallet.NewInternalWallet(lightning, &chaincfg.RegressionNetParams) // TODO
 	change := wally.ChangeAddress()
 	utxos, err := wally.Utxos(outamt, fee)
 	utxoamt := uint64(0)
@@ -133,7 +131,7 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 	}
 
 	recipients = append(recipients, &wallet.TxRecipient{Address: change, Amount: int64(utxoamt-fee) - recipamt})
-	tx, err := wallet.CreateTransaction(recipients, utxos, &chaincfg.RegressionNetParams)
+	tx, err := wallet.CreateTransaction(recipients, utxos, bitcoinNet)
 	if err != nil {
 		return nil, err
 	}

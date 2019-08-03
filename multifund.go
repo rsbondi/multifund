@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/niftynei/glightning/glightning"
 	"github.com/rsbondi/multifund/rpc"
 	"github.com/rsbondi/multifund/wallet"
@@ -16,6 +17,7 @@ var plugin *glightning.Plugin
 var lightning *glightning.Lightning
 var wallettype int
 var bitcoin *wallet.BitcoinWallet // we always use this at least for broadcasting the tx
+var bitcoinNet *chaincfg.Params
 
 func main() {
 	plugin = glightning.NewPlugin(onInit)
@@ -32,7 +34,7 @@ func main() {
 }
 
 func onInit(plugin *glightning.Plugin, options map[string]string, config *glightning.Config) {
-	log.Printf("versiion: " + VERSION + " initialized")
+	log.Printf("versiion: %s initialized for wallet type %s", VERSION, options["multi-wallet"])
 	options["rpc-file"] = fmt.Sprintf("%s/%s", config.LightningDir, config.RpcFile)
 	switch options["multi-wallet"] {
 	case "bitcoin":
@@ -45,6 +47,23 @@ func onInit(plugin *glightning.Plugin, options map[string]string, config *glight
 	lightning.StartUp(config.RpcFile, config.LightningDir)
 
 	bitcoin = wallet.NewBitcoinWallet()
+
+	cfg, err := rpc.ListConfigs()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	switch cfg.Network {
+	case "bitcoin":
+		bitcoinNet = &chaincfg.MainNetParams
+	case "regtest":
+		bitcoinNet = &chaincfg.RegressionNetParams
+	case "signet":
+		panic("unsupported network")
+	default:
+		bitcoinNet = &chaincfg.TestNet3Params
+	}
+
 }
 
 func registerOptions(p *glightning.Plugin) {

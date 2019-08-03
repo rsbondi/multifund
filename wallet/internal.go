@@ -206,7 +206,7 @@ func (i *InternalWallet) Sign(tx *Transaction, utxos []UTXO) {
 		}
 		pk, _ := key.ECPrivKey()
 
-		sigScript, err := txscript.WitnessSignature(txToSign, txscript.NewTxSigHashes(txToSign), n, int64(u.Amount), prevmsgtx.TxOut[0].PkScript, txscript.SigHashAll, pk, true)
+		sigScript, err := txscript.WitnessSignature(txToSign, txscript.NewTxSigHashes(txToSign), n, int64(u.Amount), prevmsgtx.TxOut[int(u.OutPoint.Index)].PkScript, txscript.SigHashAll, pk, true)
 		if err != nil {
 			log.Printf("cannot create sig script: %s", err.Error())
 		}

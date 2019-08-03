@@ -93,6 +93,7 @@ type ListConfigsResponse struct {
 	BitcoinRpcPassword string `json:"bitcoin-rpcpassword"`
 	BitcoinRpcConnect  string `json:"bitcoin-rpcconnect"` // host:port
 	BitcoinRpcPort     string `json:"bitcoin-rpcport"`    // can this be used if connect is just the host? it works with localhost
+	Network            string `json:"network"`
 }
 
 func ListConfigs() (*ListConfigsResponse, error) {
