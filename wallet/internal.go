@@ -1,6 +1,7 @@
 package wallet
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"database/sql"
 	"errors"
@@ -12,7 +13,9 @@ import (
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/hdkeychain"
 	"github.com/niftynei/glightning/glightning"
 	"golang.org/x/crypto/hkdf"
@@ -31,7 +34,6 @@ func NewInternalWallet(l *glightning.Lightning, net *chaincfg.Params) *InternalW
 		panic(err)
 	}
 
-	// f, err := os.Open(usr.HomeDir + "/.local/lib/python3.7/site-packages/lnet/run/lightning-4/hsm_secret")
 	f, err := os.Open(usr.HomeDir + "/.lightning/hsm_secret") // TODO: listconfigs
 	if err != nil {
 		panic(err)
@@ -71,6 +73,7 @@ type Outs struct {
 func (i *InternalWallet) Utxos(amt uint64, fee uint64) ([]UTXO, error) {
 	dbpath := i.dir + "/lightningd.sqlite3"
 	db, err := sql.Open("sqlite3", dbpath)
+	defer db.Close()
 	if err != nil {
 		log.Printf("cannot open database: %s", err.Error())
 	}
@@ -138,7 +141,7 @@ func (i *InternalWallet) Utxos(amt uint64, fee uint64) ([]UTXO, error) {
 			log.Printf("unable to decode txid %s\n", err)
 
 		}
-		h, err := chainhash.NewHash(reverseBytes(txid))
+		h, err := chainhash.NewHash(txid)
 		if err != nil {
 			log.Printf("unable to create hash from txid %s\n", err)
 			return nil, err
@@ -161,7 +164,65 @@ func (i *InternalWallet) ChangeAddress() string {
 	return addr
 }
 
-func (b *InternalWallet) Sign(tx *Transaction, utxos []UTXO) {
-	// sig, err := pk.Sign([]byte(tx.Unsigned))
+func (i *InternalWallet) Sign(tx *Transaction, utxos []UTXO) {
+	partial := tx.Unsigned
+	log.Printf("unsigned: %x", partial)
+
+	dbpath := i.dir + "/lightningd.sqlite3"
+	db, err := sql.Open("sqlite3", dbpath)
+	defer db.Close()
+	if err != nil {
+		log.Printf("cannot open database: %s", err.Error())
+	}
+
+	for n, u := range utxos {
+		t, err := btcutil.NewTxFromBytes(partial)
+		txToSign := t.MsgTx()
+
+		rawtx := make([]byte, 0)
+		txhash := fmt.Sprintf("%x", u.OutPoint.Hash.CloneBytes())
+		log.Printf("txhash for transaction: %s", txhash)
+		err = db.QueryRow("SELECT rawtx FROM transactions WHERE HEX(id)=? COLLATE NOCASE", txhash).Scan(&rawtx)
+
+		if err != nil {
+			log.Printf("cannot scan row: %s", err.Error())
+		}
+		log.Printf("row: %s %x\n", u.OutPoint.Hash.String(), rawtx)
+		prevtx, err := btcutil.NewTxFromBytes(rawtx)
+		prevmsgtx := prevtx.MsgTx()
+
+		keyindex := uint32(0)
+		log.Printf("selecting output %s %d", txhash, u.OutPoint.Index)
+		err = db.QueryRow("SELECT keyindex FROM outputs WHERE HEX(prev_out_tx)=? COLLATE NOCASE and prev_out_index=?",
+			txhash, u.OutPoint.Index).Scan(&keyindex)
+
+		log.Printf("row: %d\n", keyindex)
+		if err != nil {
+			log.Printf("cannot read database row: %s", err.Error())
+		}
+		key, err := i.master.Child(keyindex)
+		if err != nil {
+			log.Printf("cannot derive key for signing: %s", err.Error())
+		}
+		pk, _ := key.ECPrivKey()
+
+		sigScript, err := txscript.WitnessSignature(txToSign, txscript.NewTxSigHashes(txToSign), n, int64(u.Amount), prevmsgtx.TxOut[0].PkScript, txscript.SigHashAll, pk, true)
+		if err != nil {
+			log.Printf("cannot create sig script: %s", err.Error())
+		}
+		txToSign.TxIn[n].Witness = sigScript
+		log.Printf("sig script: %x", sigScript)
+
+		var txsig bytes.Buffer
+		if err != nil {
+			log.Printf("cannot sign: %s", err.Error())
+		}
+		err = txToSign.Serialize(&txsig)
+		log.Printf("sig: %x", txsig.Bytes())
+
+		partial = txsig.Bytes()
+	}
+	log.Printf("fully signed: %x", partial)
+	tx.Signed = partial
 
 }
