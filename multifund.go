@@ -17,6 +17,7 @@ var plugin *glightning.Plugin
 var lightning *glightning.Lightning
 var wallettype int
 var bitcoin *wallet.BitcoinWallet // we always use this at least for broadcasting the tx
+var internalWallet wallet.Wallet
 var bitcoinNet *chaincfg.Params
 var lightningdir string
 
@@ -32,6 +33,13 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func InternalWallet() wallet.Wallet {
+	if internalWallet == nil {
+		internalWallet = wallet.NewInternalWallet(lightning, bitcoinNet, lightningdir)
+	}
+	return internalWallet
 }
 
 func onInit(plugin *glightning.Plugin, options map[string]string, config *glightning.Config) {

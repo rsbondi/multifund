@@ -35,8 +35,6 @@ func (f *MultiWithdraw) New() interface{} {
 	return &MultiWithdraw{}
 }
 
-var internalWallet wallet.Wallet
-
 func withdrawMulti(targets *[]MultiWithdrawRequest) (jrpc2.Result, error) {
 	var recipients = make([]*wallet.TxRecipient, 0)
 	outamt := uint64(0)
@@ -57,13 +55,9 @@ func withdrawMulti(targets *[]MultiWithdrawRequest) (jrpc2.Result, error) {
 		outamt += uint64(c.Satoshi)
 	}
 
-	// TODO: need a way to register wallets so additional plugins could add additional wallet types
-	if internalWallet == nil {
-		internalWallet = wallet.NewInternalWallet(lightning, bitcoinNet, lightningdir)
-	}
-
-	change := internalWallet.ChangeAddress()
-	utxos, err := internalWallet.Utxos(outamt, fee)
+	internal := InternalWallet()
+	change := internal.ChangeAddress()
+	utxos, err := internal.Utxos(outamt, fee)
 	utxoamt := uint64(0)
 	for _, u := range utxos {
 		utxoamt += u.Amount
@@ -87,7 +81,7 @@ func withdrawMulti(targets *[]MultiWithdrawRequest) (jrpc2.Result, error) {
 		return nil, err
 	}
 
-	internalWallet.Sign(&tx, utxos)
+	internal.Sign(&tx, utxos)
 	wtx := wire.NewMsgTx(2)
 	r := bytes.NewReader(tx.Signed)
 	wtx.Deserialize(r)

@@ -103,7 +103,7 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 		case wallet.WALLET_BITCOIN:
 			wally = bitcoin
 		case wallet.WALLET_INTERNAL:
-			wally = wallet.NewInternalWallet(lightning, bitcoinNet, lightningdir)
+			wally = InternalWallet() //wallet.NewInternalWallet(lightning, bitcoinNet, lightningdir)
 		case wallet.WALLET_EXTERNAL:
 			resp := &outputs
 			return resp, nil
