@@ -179,8 +179,9 @@ func (i *InternalWallet) Sign(tx *Transaction, utxos []UTXO) {
 		prevmsgtx := prevtx.MsgTx()
 
 		keyindex := uint32(0)
-		err = db.QueryRow("SELECT keyindex FROM outputs WHERE HEX(prev_out_tx)=? COLLATE NOCASE and prev_out_index=?",
-			txhash, u.OutPoint.Index).Scan(&keyindex)
+		scriptpubkey := make([]byte, 0)
+		err = db.QueryRow("SELECT keyindex, scriptpubkey FROM outputs WHERE HEX(prev_out_tx)=? COLLATE NOCASE and prev_out_index=?",
+			txhash, u.OutPoint.Index).Scan(&keyindex, &scriptpubkey)
 
 		if err != nil {
 			log.Printf("cannot read database row: %s", err.Error())
@@ -191,11 +192,22 @@ func (i *InternalWallet) Sign(tx *Transaction, utxos []UTXO) {
 		}
 		pk, _ := key.ECPrivKey()
 
-		sigScript, err := txscript.WitnessSignature(txToSign, txscript.NewTxSigHashes(txToSign), n, int64(u.Amount), prevmsgtx.TxOut[int(u.OutPoint.Index)].PkScript, txscript.SigHashAll, pk, true)
+		var witSig wire.TxWitness
+		pks := prevmsgtx.TxOut[int(u.OutPoint.Index)].PkScript
+
+		if txscript.IsPayToScriptHash(pks) {
+			h160 := btcutil.Hash160(pk.PubKey().SerializeCompressed())
+
+			log.Printf("h160: %x", h160)
+			txToSign.TxIn[n].SignatureScript = append([]byte{0x16, 0x00, 0x14}, h160...)
+		}
+
+		witSig, err = txscript.WitnessSignature(txToSign, txscript.NewTxSigHashes(txToSign), n, int64(u.Amount), pks, txscript.SigHashAll, pk, true)
 		if err != nil {
 			log.Printf("cannot create sig script: %s", err.Error())
 		}
-		txToSign.TxIn[n].Witness = sigScript
+
+		txToSign.TxIn[n].Witness = witSig
 
 		var txsig bytes.Buffer
 		if err != nil {
