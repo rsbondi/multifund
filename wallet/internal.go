@@ -197,9 +197,8 @@ func (i *InternalWallet) Sign(tx *Transaction, utxos []UTXO) {
 
 		if txscript.IsPayToScriptHash(pks) {
 			h160 := btcutil.Hash160(pk.PubKey().SerializeCompressed())
-
-			log.Printf("h160: %x", h160)
-			txToSign.TxIn[n].SignatureScript = append([]byte{0x16, 0x00, 0x14}, h160...)
+			pks = append([]byte{0x00, 0x14}, h160...)
+			txToSign.TxIn[n].SignatureScript = append([]byte{0x16}, pks...)
 		}
 
 		witSig, err = txscript.WitnessSignature(txToSign, txscript.NewTxSigHashes(txToSign), n, int64(u.Amount), pks, txscript.SigHashAll, pk, true)
