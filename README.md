@@ -25,13 +25,11 @@ Also one command has been added for multi destination withdraw
 
 provide an array of objects with `destination` and `satoshi` values
 
-Using bitcoin core node as the wallet type works seems to be working
+Using either bitcoin core wallet or internal clightning wallet types seem to be working
 
-You must launch lightningd with the `bitcoin-xxx` either in the config file or command line.  It will eventually read them from the `bitcoin.conf` file.  The bitcoin core node is used for broadcasting transactions so it must be accessible even if you use clightning internal wallet.
+The bitcoin core node is used for broadcasting transactions so it must be accessible even if you use clightning internal wallet.
 
 TODO:
-* Read from  `bitcoin.conf` if not available from lightning config
 * Allow to set `feerate` and `minconf` on `withdraw_multi` to be consistent with `withdraw`
-* Improve size calculation for fee value
 
 [demo video](https://www.youtube.com/watch?v=exDYLpTncng&feature=youtu.be)

@@ -82,6 +82,9 @@ func (i *InternalWallet) Utxos(amt uint64, fee uint64) ([]UTXO, error) {
 	unspent := make([]Outs, 0)
 	candidates := make([]*Outs, 0)
 
+	// TODO: the coin selection should be refactored out to DRY it out
+	//       result sets are of different data types, need to convert both wallet types to use the same standard
+	//       then refactor to a common coin selection
 	for rows.Next() {
 		u := Outs{}
 		err = rows.Scan(&u.PrevOutTx, &u.PrevOutIndex, &u.Value, &u.Scriptpubkey)
@@ -170,15 +173,7 @@ func (i *InternalWallet) Sign(tx *Transaction, utxos []UTXO) {
 		t, err := btcutil.NewTxFromBytes(partial)
 		txToSign := t.MsgTx()
 
-		rawtx := make([]byte, 0)
 		txhash := fmt.Sprintf("%x", u.OutPoint.Hash.CloneBytes())
-		err = db.QueryRow("SELECT rawtx FROM transactions WHERE HEX(id)=? COLLATE NOCASE", txhash).Scan(&rawtx)
-
-		if err != nil {
-			log.Printf("cannot scan row: %s", err.Error())
-		}
-		prevtx, err := btcutil.NewTxFromBytes(rawtx)
-		prevmsgtx := prevtx.MsgTx()
 
 		keyindex := uint32(0)
 		scriptpubkey := make([]byte, 0)
@@ -195,15 +190,14 @@ func (i *InternalWallet) Sign(tx *Transaction, utxos []UTXO) {
 		pk, _ := key.ECPrivKey()
 
 		var witSig wire.TxWitness
-		pks := prevmsgtx.TxOut[int(u.OutPoint.Index)].PkScript
 
-		if txscript.IsPayToScriptHash(pks) {
+		if txscript.IsPayToScriptHash(scriptpubkey) {
 			h160 := btcutil.Hash160(pk.PubKey().SerializeCompressed())
-			pks = append([]byte{0x00, 0x14}, h160...)
-			txToSign.TxIn[n].SignatureScript = append([]byte{0x16}, pks...)
+			scriptpubkey = append([]byte{0x00, 0x14}, h160...)
+			txToSign.TxIn[n].SignatureScript = append([]byte{0x16}, scriptpubkey...)
 		}
 
-		witSig, err = txscript.WitnessSignature(txToSign, txscript.NewTxSigHashes(txToSign), n, int64(u.Amount), pks, txscript.SigHashAll, pk, true)
+		witSig, err = txscript.WitnessSignature(txToSign, txscript.NewTxSigHashes(txToSign), n, int64(u.Amount), scriptpubkey, txscript.SigHashAll, pk, true)
 		if err != nil {
 			log.Printf("cannot create sig script: %s", err.Error())
 		}
