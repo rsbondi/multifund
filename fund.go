@@ -145,14 +145,11 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 		recipients = append(recipients, &wallet.TxRecipient{Address: change, Amount: int64(utxoamt-fee) - recipamt})
 		// recalculate fee, for more accureate change amount
 		vsize := wallet.InputFeeSats(utxos, bitcoinNet) + wallet.OutputFeeSats(recipients, bitcoinNet) + 11
-		log.Printf("calculated vsize: %d", vsize)
-		log.Printf("original fee: %d", fee)
 		if feerate == 0.0 {
 			fee = 2 * vsize
 		} else {
 			fee = wallet.Satoshis(feerate) * vsize
 		}
-		log.Printf("adjusted fee: %d", fee)
 		recipients[len(recipients)-1].Amount = int64(utxoamt-fee) - recipamt
 	}
 	tx, err := wallet.CreateTransaction(recipients, utxos, bitcoinNet)

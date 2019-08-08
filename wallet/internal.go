@@ -94,6 +94,10 @@ func (i *InternalWallet) Utxos(amt uint64, fee uint64) ([]UTXO, error) {
 			txid := u.PrevOutTx
 			h, _ := chainhash.NewHash(txid)
 			o := wire.NewOutPoint(h, uint32(u.PrevOutIndex))
+
+			// this is hacky, converting to address so we can convert back to scriptpubkey later
+			// bitcoin core uses the address to get the keys for signing, so maybe keep address and add scriptpubkey
+			// maybe best is not save address, and attach a func to UTXO to get address from scriptpubkey
 			_, addr, _, _ := txscript.ExtractPkScriptAddrs(u.Scriptpubkey, i.net)
 
 			utxos := []UTXO{UTXO{uint64(u.Value), addr[0].String(), *o}}

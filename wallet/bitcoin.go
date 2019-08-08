@@ -7,8 +7,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -44,7 +47,44 @@ func NewBitcoinWallet() *BitcoinWallet {
 		host = "127.0.0.1"
 		port = cfg.BitcoinRpcPort
 	} else {
-		// TODO: get from ~/.bitcoin/bitcoin.conf
+		userdir, err := os.UserHomeDir()
+		if err != nil {
+			log.Fatal(err)
+		}
+		f, err := os.Open(userdir + "/.bitcoin/bitcoin.conf")
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer f.Close()
+		b, err := ioutil.ReadAll(f)
+		lines := strings.Split(string(b), "\n")
+		for _, line := range lines {
+			if len(line) > 0 {
+				valid := strings.TrimSpace(strings.Split(line, "#")[0]) // ignore comments
+				configmatch(valid, "^rpcuser=(.+)$", &user)
+				configmatch(valid, "^rpcpassword=(.+)$", &pass)
+				configmatch(valid, "^rpcbind=(.+)$", &host)
+				configmatch(valid, "^rpcport=(.+)$", &port)
+			}
+		}
+		if host == "" {
+			host = "127.0.0.1"
+		}
+		if port == "" {
+			for _, line := range lines {
+				if len(line) > 0 {
+					valid := strings.TrimSpace(strings.Split(line, "#")[0])
+					netmatch(valid, "^([^=]+)=.+$", &port)
+				}
+			}
+			if port == "" {
+				port = "8332"
+			}
+		}
+		if user == "" {
+			// TODO: cookie auth
+			log.Fatal(errors.New("Can not access bitcoin wallet"))
+		}
 	}
 
 	if host == "" || port == "" || user == "" || pass == "" {
@@ -56,6 +96,26 @@ func NewBitcoinWallet() *BitcoinWallet {
 		rpcport:     port,
 		rpcuser:     user,
 		rpcpassword: pass,
+	}
+}
+
+func configmatch(line string, exp string, setme *string) {
+	r, _ := regexp.Compile(exp)
+	u := r.FindStringSubmatch(line)
+	if len(u) > 0 {
+		*setme = u[1]
+	}
+}
+
+func netmatch(line string, exp string, setme *string) {
+	r, _ := regexp.Compile(exp)
+	u := r.FindStringSubmatch(line)
+	if len(u) > 0 {
+		if u[1] == "regtest" {
+			*setme = "18443"
+		} else if u[1] == "testnet" {
+			*setme = "18332"
+		}
 	}
 }
 

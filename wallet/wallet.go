@@ -10,7 +10,7 @@ const (
 	WALLET_INTERNAL
 )
 
-const DUST_LIMIT = uint64(1000)
+const DUST_LIMIT = uint64(546)
 
 type Wallet interface {
 
