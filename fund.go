@@ -81,7 +81,14 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 	outputs := make(map[string]*wallet.Outputs, 0)
 	outamt := uint64(0)
 	rate := bitcoin.EstimateSmartFee(100)
-	kb := uint64(160 + 70*len(*chans)) // crude size calc
+	// fee calc, we know the output rate, type is known before we create the addresses
+	//   43 vbytes per channel
+	// we don't know how many utxos, and wee need some starting point to fetch them
+	//   so we have a chicken/egg scenario
+	//   this could be way off if a bunch of small utxos, but we have the dust buffer
+	//   and we may not use change if we are within the dust buffer
+	//   this may need further consideration
+	kb := uint64(160 + 43*len(*chans)) // this may change if we need mor utxos
 	feerate := rate.Result.(*wallet.EstimateSmartFeeResult).Feerate / 1000.0
 
 	var fee uint64
@@ -103,7 +110,7 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 		case wallet.WALLET_BITCOIN:
 			wally = bitcoin
 		case wallet.WALLET_INTERNAL:
-			wally = InternalWallet() //wallet.NewInternalWallet(lightning, bitcoinNet, lightningdir)
+			wally = InternalWallet()
 		case wallet.WALLET_EXTERNAL:
 			resp := &outputs
 			return resp, nil
@@ -136,6 +143,17 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 
 	if utxoamt-fee > wallet.DUST_LIMIT { // no change if dust, save on tx fee
 		recipients = append(recipients, &wallet.TxRecipient{Address: change, Amount: int64(utxoamt-fee) - recipamt})
+		// recalculate fee, for more accureate change amount
+		vsize := wallet.InputFeeSats(utxos, bitcoinNet) + wallet.OutputFeeSats(recipients, bitcoinNet) + 11
+		log.Printf("calculated vsize: %d", vsize)
+		log.Printf("original fee: %d", fee)
+		if feerate == 0.0 {
+			fee = 2 * vsize
+		} else {
+			fee = wallet.Satoshis(feerate) * vsize
+		}
+		log.Printf("adjusted fee: %d", fee)
+		recipients[len(recipients)-1].Amount = int64(utxoamt-fee) - recipamt
 	}
 	tx, err := wallet.CreateTransaction(recipients, utxos, bitcoinNet)
 	if err != nil {

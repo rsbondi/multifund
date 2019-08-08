@@ -92,13 +92,11 @@ func (i *InternalWallet) Utxos(amt uint64, fee uint64) ([]UTXO, error) {
 		sats := uint64(u.Value)
 		if sats >= amt+fee && sats <= amt+fee+DUST_LIMIT {
 			txid := u.PrevOutTx
-			if err != nil {
-				log.Printf("unable to decode txid %s\n", err)
-
-			}
 			h, _ := chainhash.NewHash(txid)
 			o := wire.NewOutPoint(h, uint32(u.PrevOutIndex))
-			utxos := []UTXO{UTXO{uint64(u.Value), "", *o}}
+			_, addr, _, _ := txscript.ExtractPkScriptAddrs(u.Scriptpubkey, i.net)
+
+			utxos := []UTXO{UTXO{uint64(u.Value), addr[0].String(), *o}}
 			return utxos, nil
 		}
 		if sats > amt+fee+DUST_LIMIT {
@@ -138,8 +136,8 @@ func (i *InternalWallet) Utxos(amt uint64, fee uint64) ([]UTXO, error) {
 		}
 
 		o := wire.NewOutPoint(h, uint32(c.PrevOutIndex))
-
-		utxos = append(utxos, UTXO{uint64(c.Value), "", *o})
+		_, addr, _, _ := txscript.ExtractPkScriptAddrs(c.Scriptpubkey, i.net)
+		utxos = append(utxos, UTXO{uint64(c.Value), addr[0].String(), *o})
 	}
 
 	return utxos, nil
