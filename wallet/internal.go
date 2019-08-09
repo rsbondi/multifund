@@ -189,15 +189,13 @@ func (i *InternalWallet) Sign(tx *Transaction, utxos []UTXO) {
 		}
 		pk, _ := key.ECPrivKey()
 
-		var witSig wire.TxWitness
-
 		if txscript.IsPayToScriptHash(scriptpubkey) {
 			h160 := btcutil.Hash160(pk.PubKey().SerializeCompressed())
 			scriptpubkey = append([]byte{0x00, 0x14}, h160...)
 			txToSign.TxIn[n].SignatureScript = append([]byte{0x16}, scriptpubkey...)
 		}
 
-		witSig, err = txscript.WitnessSignature(txToSign, txscript.NewTxSigHashes(txToSign), n, int64(u.Amount), scriptpubkey, txscript.SigHashAll, pk, true)
+		witSig, err := txscript.WitnessSignature(txToSign, txscript.NewTxSigHashes(txToSign), n, int64(u.Amount), scriptpubkey, txscript.SigHashAll, pk, true)
 		if err != nil {
 			log.Printf("cannot create sig script: %s", err.Error())
 		}

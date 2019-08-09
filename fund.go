@@ -163,13 +163,14 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 	wtx.Deserialize(r)
 	tx.TxId = wtx.TxHash().String()
 
+	channels := make([]*rpc.FundChannelCompleteResponse, 0)
 	for k, o := range outputs {
-		_, err := rpc.FundChannelComplete(k, tx.TxId, o.Vout)
+		cid, err := rpc.FundChannelComplete(k, tx.TxId, o.Vout)
 		if err != nil {
 			closeMulti(outputs)
 			return nil, err
 		}
-
+		channels = append(channels, cid)
 	}
 
 	txid, err := bitcoin.SendTx(tx.String())
@@ -178,7 +179,16 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 		return nil, err
 	}
 
-	return txid, nil
+	return struct {
+		Tx       string                             `json:"tx"`
+		Txid     string                             `json:"txid"`
+		Channels []*rpc.FundChannelCompleteResponse `json:"channels"`
+	}{
+		tx.String(),
+		txid,
+		channels,
+	}, nil
+	// return txid, nil
 
 }
 
