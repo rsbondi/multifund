@@ -88,15 +88,15 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 	//   this could be way off if a bunch of small utxos, but we have the dust buffer
 	//   and we may not use change if we are within the dust buffer
 	//   this may need further consideration
-	kb := uint64(160 + 43*len(*chans)) // this may change if we need mor utxos
+	bytesEstimate := uint64(160 + 43*len(*chans)) // this may change if we need mor utxos
 	feerate := rate.Result.(*wallet.EstimateSmartFeeResult).Feerate / 1000.0
 
 	var fee uint64
 	if feerate == 0.0 {
 		log.Println("unable to estimate fee rate, using default")
-		fee = 2 * kb
+		fee = 2 * bytesEstimate
 	} else {
-		fee = wallet.Satoshis(feerate) * kb
+		fee = wallet.Satoshis(feerate) * bytesEstimate
 	}
 
 	recipamt := int64(0)
@@ -104,17 +104,12 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 		outamt += uint64(c.Amount)
 	}
 
-	// TODO: need a way to register wallets so additional plugins could add additional wallet types
 	if wally == nil {
 		switch wallettype {
 		case wallet.WALLET_BITCOIN:
 			wally = bitcoin
 		case wallet.WALLET_INTERNAL:
 			wally = InternalWallet()
-		case wallet.WALLET_EXTERNAL:
-			resp := &outputs
-			return resp, nil
-
 		}
 	}
 
@@ -188,8 +183,6 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 		txid,
 		channels,
 	}, nil
-	// return txid, nil
-
 }
 
 func cancelMulti(outputs map[string]*wallet.Outputs) {
@@ -205,7 +198,7 @@ func closeMulti(outputs map[string]*wallet.Outputs) {
 	for k, _ := range outputs {
 		_, err := lightning.CloseNormal(k)
 		if err != nil {
-			log.Printf("fundchannel_cancel error: %s", err.Error())
+			log.Printf("channel close error: %s", err.Error())
 		}
 	}
 }

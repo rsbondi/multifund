@@ -49,8 +49,6 @@ func onInit(plugin *glightning.Plugin, options map[string]string, config *glight
 	switch options["multi-wallet"] {
 	case "bitcoin":
 		wallettype = wallet.WALLET_BITCOIN
-	case "external":
-		wallettype = wallet.WALLET_EXTERNAL
 	default:
 		wallettype = wallet.WALLET_INTERNAL
 	}
@@ -77,7 +75,7 @@ func onInit(plugin *glightning.Plugin, options map[string]string, config *glight
 }
 
 func registerOptions(p *glightning.Plugin) {
-	p.RegisterOption(glightning.NewOption("multi-wallet", "Wallet to use for multi-channel open - internal, bitcoin or external", "internal"))
+	p.RegisterOption(glightning.NewOption("multi-wallet", "Wallet to use for multi-channel open - internal or bitcoin", "internal"))
 }
 
 // fund_multi [{"id":"0265b6...", "satoshi": 20000, "announce":true}, {id, satoshi, announce}...]

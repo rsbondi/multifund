@@ -6,7 +6,6 @@ import (
 
 const (
 	WALLET_BITCOIN int = iota
-	WALLET_EXTERNAL
 	WALLET_INTERNAL
 )
 

@@ -39,15 +39,15 @@ func withdrawMulti(targets *[]MultiWithdrawRequest) (jrpc2.Result, error) {
 	var recipients = make([]*wallet.TxRecipient, 0)
 	outamt := uint64(0)
 	rate := bitcoin.EstimateSmartFee(100)
-	kb := uint64(160 + 70*len(*targets)) // crude size calc
+	bytesEstimate := uint64(160 + 70*len(*targets)) // crude size calc
 	feerate := rate.Result.(*wallet.EstimateSmartFeeResult).Feerate / 1000.0
 
 	var fee uint64
 	if feerate == 0.0 {
 		log.Println("unable to estimate fee rate, using default")
-		fee = 2 * kb
+		fee = 2 * bytesEstimate
 	} else {
-		fee = wallet.Satoshis(feerate) * kb
+		fee = wallet.Satoshis(feerate) * bytesEstimate
 	}
 
 	recipamt := int64(0)
@@ -75,6 +75,13 @@ func withdrawMulti(targets *[]MultiWithdrawRequest) (jrpc2.Result, error) {
 
 	if utxoamt-fee > wallet.DUST_LIMIT { // no change if dust, save on tx fee
 		recipients = append(recipients, &wallet.TxRecipient{Address: change, Amount: int64(utxoamt-fee) - recipamt})
+		vsize := wallet.InputFeeSats(utxos, bitcoinNet) + wallet.OutputFeeSats(recipients, bitcoinNet) + 11
+		if feerate == 0.0 {
+			fee = 2 * vsize
+		} else {
+			fee = wallet.Satoshis(feerate) * vsize
+		}
+		recipients[len(recipients)-1].Amount = int64(utxoamt-fee) - recipamt
 	}
 	tx, err := wallet.CreateTransaction(recipients, utxos, bitcoinNet)
 	if err != nil {
@@ -92,6 +99,11 @@ func withdrawMulti(targets *[]MultiWithdrawRequest) (jrpc2.Result, error) {
 		return nil, err
 	}
 
-	return txid, nil
-
+	return struct {
+		Tx   string `json:"tx"`
+		Txid string `json:"txid"`
+	}{
+		tx.String(),
+		txid,
+	}, nil
 }
