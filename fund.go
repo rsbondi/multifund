@@ -76,7 +76,17 @@ func connectAndCreateMulti(chans *[]ConnectAndFundChannelRequest) (jrpc2.Result,
 	return createMulti(&createChans)
 }
 
-func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
+type FundingInfo struct {
+	Outputs    map[string]*wallet.Outputs
+	Recipients []*wallet.TxRecipient
+	Utxos      []wallet.UTXO
+}
+
+// GetChannelAddresses provides funding information for creating a transaction
+//   the transaction can be created here or by sending the info to an external server
+//   this opens the potential for a multi party channel opening, or use of an external
+//   manual wallet signing
+func GetChannelAddresses(chans *[]rpc.FundChannelStartRequest) (*FundingInfo, error) {
 	var recipients = make([]*wallet.TxRecipient, 0)
 	outputs := make(map[string]*wallet.Outputs, 0)
 	outamt := uint64(0)
@@ -115,6 +125,9 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 
 	change := wally.ChangeAddress()
 	utxos, err := wally.Utxos(outamt, fee)
+	if err != nil {
+		return nil, err
+	}
 	utxoamt := uint64(0)
 	for _, u := range utxos {
 		utxoamt += u.Amount
@@ -127,7 +140,6 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 	for i, c := range *chans {
 		result, err := rpc.FundChannelStart(c.Id, c.Amount)
 		if err != nil {
-			cancelMulti(outputs)
 			return nil, err
 		}
 		amt := int64(c.Amount) // difference in wire and glightning
@@ -147,22 +159,37 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 		}
 		recipients[len(recipients)-1].Amount = int64(utxoamt-fee) - recipamt
 	}
-	tx, err := wallet.CreateTransaction(recipients, utxos, bitcoinNet)
+	fundinfo := &FundingInfo{
+		Outputs:    outputs,
+		Recipients: recipients,
+		Utxos:      utxos,
+	}
+	return fundinfo, nil
+}
+
+func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
+	info, err := GetChannelAddresses(chans)
+	if err != nil {
+		cancelMulti(info.Outputs)
+		return nil, err
+	}
+
+	tx, err := wallet.CreateTransaction(info.Recipients, info.Utxos, bitcoinNet)
 	if err != nil {
 		return nil, err
 	}
 
-	wally.Sign(&tx, utxos)
+	wally.Sign(&tx, info.Utxos)
 	wtx := wire.NewMsgTx(2)
 	r := bytes.NewReader(tx.Signed)
 	wtx.Deserialize(r)
 	tx.TxId = wtx.TxHash().String()
 
 	channels := make([]*rpc.FundChannelCompleteResponse, 0)
-	for k, o := range outputs {
+	for k, o := range info.Outputs {
 		cid, err := rpc.FundChannelComplete(k, tx.TxId, o.Vout)
 		if err != nil {
-			closeMulti(outputs)
+			closeMulti(info.Outputs)
 			return nil, err
 		}
 		channels = append(channels, cid)
@@ -170,7 +197,7 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 
 	txid, err := bitcoin.SendTx(tx.String())
 	if err != nil {
-		closeMulti(outputs)
+		closeMulti(info.Outputs)
 		return nil, err
 	}
 
