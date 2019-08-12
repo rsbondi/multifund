@@ -18,9 +18,9 @@ type Transaction struct {
 }
 
 type Outputs struct {
-	Vout    int    `json:"vout"`
-	Amount  int64  `json:"amount"`
-	Address string `json:"address"`
+	Vout   int    `json:"vout"`
+	Amount int64  `json:"amount"`
+	Script []byte `json:"script"`
 }
 
 func (t *Transaction) String() string {
