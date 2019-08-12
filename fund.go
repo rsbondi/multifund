@@ -167,6 +167,18 @@ func GetChannelAddresses(chans *[]rpc.FundChannelStartRequest) (*FundingInfo, er
 	return fundinfo, nil
 }
 
+func CompleteChannels(tx wallet.Transaction, outputs map[string]*wallet.Outputs) ([]*rpc.FundChannelCompleteResponse, error) {
+	channels := make([]*rpc.FundChannelCompleteResponse, 0)
+	for k, o := range outputs {
+		cid, err := rpc.FundChannelComplete(k, tx.TxId, o.Vout)
+		if err != nil {
+			return nil, err
+		}
+		channels = append(channels, cid)
+	}
+	return channels, nil
+}
+
 func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 	info, err := GetChannelAddresses(chans)
 	if err != nil {
@@ -185,14 +197,10 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 	wtx.Deserialize(r)
 	tx.TxId = wtx.TxHash().String()
 
-	channels := make([]*rpc.FundChannelCompleteResponse, 0)
-	for k, o := range info.Outputs {
-		cid, err := rpc.FundChannelComplete(k, tx.TxId, o.Vout)
-		if err != nil {
-			closeMulti(info.Outputs)
-			return nil, err
-		}
-		channels = append(channels, cid)
+	channels, err := CompleteChannels(tx, info.Outputs)
+	if err != nil {
+		closeMulti(info.Outputs)
+		return nil, err
 	}
 
 	txid, err := bitcoin.SendTx(tx.String())
