@@ -7,6 +7,7 @@ import (
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/niftynei/glightning/glightning"
+	"github.com/rsbondi/multifund/funder"
 	"github.com/rsbondi/multifund/rpc"
 	"github.com/rsbondi/multifund/wallet"
 )
@@ -14,17 +15,14 @@ import (
 const VERSION = "0.0.1-WIP"
 
 var plugin *glightning.Plugin
-var lightning *glightning.Lightning
-var wallettype int
-var bitcoin *wallet.BitcoinWallet // we always use this at least for broadcasting the tx
-var internalWallet wallet.Wallet
-var bitcoinNet *chaincfg.Params
-var lightningdir string
+
+var fundr *funder.Funder
 
 func main() {
 	plugin = glightning.NewPlugin(onInit)
-	lightning = glightning.NewLightning()
-	rpc.Init(lightning)
+	fundr = &funder.Funder{}
+	fundr.Lightning = glightning.NewLightning()
+	rpc.Init(fundr.Lightning)
 
 	registerOptions(plugin)
 	registerMethods(plugin)
@@ -35,26 +33,19 @@ func main() {
 	}
 }
 
-func InternalWallet() wallet.Wallet {
-	if internalWallet == nil {
-		internalWallet = wallet.NewInternalWallet(lightning, bitcoinNet, lightningdir)
-	}
-	return internalWallet
-}
-
 func onInit(plugin *glightning.Plugin, options map[string]string, config *glightning.Config) {
 	log.Printf("versiion: %s initialized for wallet type %s", VERSION, options["multi-wallet"])
-	lightningdir = config.LightningDir
+	fundr.Lightningdir = config.LightningDir
 	options["rpc-file"] = fmt.Sprintf("%s/%s", config.LightningDir, config.RpcFile)
 	switch options["multi-wallet"] {
 	case "bitcoin":
-		wallettype = wallet.WALLET_BITCOIN
+		fundr.Wallettype = wallet.WALLET_BITCOIN
 	default:
-		wallettype = wallet.WALLET_INTERNAL
+		fundr.Wallettype = wallet.WALLET_INTERNAL
 	}
-	lightning.StartUp(config.RpcFile, config.LightningDir)
+	fundr.Lightning.StartUp(config.RpcFile, config.LightningDir)
 
-	bitcoin = wallet.NewBitcoinWallet()
+	fundr.Bitcoin = wallet.NewBitcoinWallet()
 
 	cfg, err := rpc.ListConfigs()
 	if err != nil {
@@ -63,13 +54,13 @@ func onInit(plugin *glightning.Plugin, options map[string]string, config *glight
 
 	switch cfg.Network {
 	case "bitcoin":
-		bitcoinNet = &chaincfg.MainNetParams
+		fundr.BitcoinNet = &chaincfg.MainNetParams
 	case "regtest":
-		bitcoinNet = &chaincfg.RegressionNetParams
+		fundr.BitcoinNet = &chaincfg.RegressionNetParams
 	case "signet":
 		panic("unsupported network")
 	default:
-		bitcoinNet = &chaincfg.TestNet3Params
+		fundr.BitcoinNet = &chaincfg.TestNet3Params
 	}
 
 }

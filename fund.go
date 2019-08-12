@@ -2,11 +2,9 @@ package main
 
 import (
 	"bytes"
-	"errors"
 	"log"
 
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
 	"github.com/niftynei/glightning/jrpc2"
 	"github.com/rsbondi/multifund/rpc"
 	"github.com/rsbondi/multifund/wallet"
@@ -44,8 +42,6 @@ type MultiChannelWithConnect struct {
 	Channels []ConnectAndFundChannelRequest
 }
 
-var wally wallet.Wallet
-
 func (m *MultiChannelWithConnect) Call() (jrpc2.Result, error) {
 	return connectAndCreateMulti(&m.Channels)
 }
@@ -61,7 +57,7 @@ func (f *MultiChannelWithConnect) New() interface{} {
 func connectAndCreateMulti(chans *[]ConnectAndFundChannelRequest) (jrpc2.Result, error) {
 	createChans := make([]rpc.FundChannelStartRequest, 0)
 	for _, c := range *chans {
-		_, err := lightning.Connect(c.Id, c.Host, uint(c.Port))
+		_, err := fundr.Lightning.Connect(c.Id, c.Host, uint(c.Port))
 		if err != nil {
 			return nil, err
 		}
@@ -77,138 +73,31 @@ func connectAndCreateMulti(chans *[]ConnectAndFundChannelRequest) (jrpc2.Result,
 	return createMulti(&createChans)
 }
 
-type FundingInfo struct {
-	Outputs    map[string]*wallet.Outputs
-	Recipients []*wallet.TxRecipient
-	Utxos      []wallet.UTXO
-}
-
-// GetChannelAddresses provides funding information for creating a transaction
-//   the transaction can be created here or by sending the info to an external server
-//   this opens the potential for a multi party channel opening, or use of an external
-//   manual wallet signing
-// returns a FundingInfo struct with state, recipients and utxos
-func GetChannelAddresses(chans *[]rpc.FundChannelStartRequest) (*FundingInfo, error) {
-	var recipients = make([]*wallet.TxRecipient, 0)
-	outputs := make(map[string]*wallet.Outputs, 0)
-	outamt := uint64(0)
-	rate := bitcoin.EstimateSmartFee(100)
-	// fee calc, we know the output rate, type is known before we create the addresses
-	//   43 vbytes per channel
-	// we don't know how many utxos, and wee need some starting point to fetch them
-	//   so we have a chicken/egg scenario
-	//   this could be way off if a bunch of small utxos, but we have the dust buffer
-	//   and we may not use change if we are within the dust buffer
-	//   this may need further consideration
-	bytesEstimate := uint64(160 + 43*len(*chans)) // this may change if we need mor utxos
-	feerate := rate.Result.(*wallet.EstimateSmartFeeResult).Feerate / 1000.0
-
-	var fee uint64
-	if feerate == 0.0 {
-		log.Println("unable to estimate fee rate, using default")
-		fee = 2 * bytesEstimate
-	} else {
-		fee = wallet.Satoshis(feerate) * bytesEstimate
-	}
-
-	recipamt := int64(0)
-	for _, c := range *chans {
-		outamt += uint64(c.Amount)
-	}
-
-	if wally == nil {
-		switch wallettype {
-		case wallet.WALLET_BITCOIN:
-			wally = bitcoin
-		case wallet.WALLET_INTERNAL:
-			wally = InternalWallet()
-		}
-	}
-
-	change := wally.ChangeAddress()
-	utxos, err := wally.Utxos(outamt, fee)
-	if err != nil {
-		return nil, err
-	}
-	utxoamt := uint64(0)
-	for _, u := range utxos {
-		utxoamt += u.Amount
-	}
-
-	if outamt > utxoamt+fee {
-		return nil, errors.New("Insufficient funds, Need more coin")
-	}
-
-	for i, c := range *chans {
-		result, err := rpc.FundChannelStart(c.Id, c.Amount)
-		if err != nil {
-			return nil, err
-		}
-		addr, err := btcutil.DecodeAddress(result.FundingAddress, bitcoinNet)
-		addr.ScriptAddress()
-
-		amt := int64(c.Amount) // difference in wire and glightning
-		outputs[c.Id] = &wallet.Outputs{Vout: i, Amount: amt, Script: addr.ScriptAddress()}
-		recipamt += amt
-		recipients = append(recipients, &wallet.TxRecipient{Address: result.FundingAddress, Amount: amt})
-	}
-
-	if utxoamt-fee > wallet.DUST_LIMIT { // no change if dust, save on tx fee
-		recipients = append(recipients, &wallet.TxRecipient{Address: change, Amount: int64(utxoamt-fee) - recipamt})
-		// recalculate fee, for more accureate change amount
-		vsize := wallet.InputFeeSats(utxos, bitcoinNet) + wallet.OutputFeeSats(recipients, bitcoinNet) + 11
-		if feerate == 0.0 {
-			fee = 2 * vsize
-		} else {
-			fee = wallet.Satoshis(feerate) * vsize
-		}
-		recipients[len(recipients)-1].Amount = int64(utxoamt-fee) - recipamt
-	}
-	fundinfo := &FundingInfo{
-		Outputs:    outputs,
-		Recipients: recipients,
-		Utxos:      utxos,
-	}
-	return fundinfo, nil
-}
-
-func CompleteChannels(tx wallet.Transaction, outputs map[string]*wallet.Outputs) ([]*rpc.FundChannelCompleteResponse, error) {
-	channels := make([]*rpc.FundChannelCompleteResponse, 0)
-	for k, o := range outputs {
-		cid, err := rpc.FundChannelComplete(k, tx.TxId, o.Vout)
-		if err != nil {
-			return nil, err
-		}
-		channels = append(channels, cid)
-	}
-	return channels, nil
-}
-
 func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
-	info, err := GetChannelAddresses(chans)
+	info, err := fundr.GetChannelAddresses(chans)
 	if err != nil {
 		cancelMulti(info.Outputs)
 		return nil, err
 	}
 
-	tx, err := wallet.CreateTransaction(info.Recipients, info.Utxos, bitcoinNet)
+	tx, err := wallet.CreateTransaction(info.Recipients, info.Utxos, fundr.BitcoinNet)
 	if err != nil {
 		return nil, err
 	}
 
-	wally.Sign(&tx, info.Utxos)
+	fundr.Wally.Sign(&tx, info.Utxos)
 	wtx := wire.NewMsgTx(2)
 	r := bytes.NewReader(tx.Signed)
 	wtx.Deserialize(r)
 	tx.TxId = wtx.TxHash().String()
 
-	channels, err := CompleteChannels(tx, info.Outputs)
+	channels, err := fundr.CompleteChannels(tx, info.Outputs)
 	if err != nil {
 		closeMulti(info.Outputs)
 		return nil, err
 	}
 
-	txid, err := bitcoin.SendTx(tx.String())
+	txid, err := fundr.Bitcoin.SendTx(tx.String())
 	if err != nil {
 		closeMulti(info.Outputs)
 		return nil, err
@@ -236,7 +125,7 @@ func cancelMulti(outputs map[string]*wallet.Outputs) {
 
 func closeMulti(outputs map[string]*wallet.Outputs) {
 	for k, _ := range outputs {
-		_, err := lightning.CloseNormal(k)
+		_, err := fundr.Lightning.CloseNormal(k)
 		if err != nil {
 			log.Printf("channel close error: %s", err.Error())
 		}
