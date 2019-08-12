@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcutil"
 	"github.com/niftynei/glightning/jrpc2"
 	"github.com/rsbondi/multifund/rpc"
 	"github.com/rsbondi/multifund/wallet"
@@ -86,6 +87,7 @@ type FundingInfo struct {
 //   the transaction can be created here or by sending the info to an external server
 //   this opens the potential for a multi party channel opening, or use of an external
 //   manual wallet signing
+// returns a FundingInfo struct with state, recipients and utxos
 func GetChannelAddresses(chans *[]rpc.FundChannelStartRequest) (*FundingInfo, error) {
 	var recipients = make([]*wallet.TxRecipient, 0)
 	outputs := make(map[string]*wallet.Outputs, 0)
@@ -142,8 +144,11 @@ func GetChannelAddresses(chans *[]rpc.FundChannelStartRequest) (*FundingInfo, er
 		if err != nil {
 			return nil, err
 		}
+		addr, err := btcutil.DecodeAddress(result.FundingAddress, bitcoinNet)
+		addr.ScriptAddress()
+
 		amt := int64(c.Amount) // difference in wire and glightning
-		outputs[c.Id] = &wallet.Outputs{Vout: i, Amount: amt, Address: result.FundingAddress}
+		outputs[c.Id] = &wallet.Outputs{Vout: i, Amount: amt, Script: addr.ScriptAddress()}
 		recipamt += amt
 		recipients = append(recipients, &wallet.TxRecipient{Address: result.FundingAddress, Amount: amt})
 	}
