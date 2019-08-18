@@ -73,17 +73,14 @@ func registerOptions(p *glightning.Plugin) {
 func registerMethods(p *glightning.Plugin) {
 	multi := glightning.NewRpcMethod(&MultiChannel{}, `Open multiple channels in single transaction`)
 	multi.LongDesc = FundMultiDescription
-	multi.Usage = "channels"
 	p.RegisterMethod(multi)
 
 	multic := glightning.NewRpcMethod(&MultiChannelWithConnect{}, `Connects peers and opens multiple channels in single transaction`)
 	multic.LongDesc = "{peers} consist of {id, host, port, satoshi, announce}"
-	multic.Usage = "peers"
 	p.RegisterMethod(multic)
 
 	multiw := glightning.NewRpcMethod(&MultiWithdraw{}, `Batch withdraw funds to multiple destinations`)
 	multiw.LongDesc = `{destinations} consist of an array of{"destination": ADDRESS, "satoshi": n}`
-	multiw.Usage = "destinations"
 	p.RegisterMethod(multiw)
 
 }

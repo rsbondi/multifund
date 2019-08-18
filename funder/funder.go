@@ -7,7 +7,6 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcutil"
 	"github.com/niftynei/glightning/glightning"
-	"github.com/rsbondi/multifund/rpc"
 	"github.com/rsbondi/multifund/wallet"
 )
 
@@ -40,7 +39,7 @@ func (f *Funder) InternalWallet() wallet.Wallet {
 //   this opens the potential for a multi party channel opening, or use of an external
 //   manual wallet signing
 // returns a FundingInfo struct with state, recipients and utxos
-func (f *Funder) GetChannelAddresses(chans *[]rpc.FundChannelStartRequest) (*FundingInfo, error) {
+func (f *Funder) GetChannelAddresses(chans *[]glightning.FundChannelStart) (*FundingInfo, error) {
 	var recipients = make([]*wallet.TxRecipient, 0)
 	outputs := make(map[string]*wallet.Outputs, 0)
 	outamt := uint64(0)
@@ -92,17 +91,18 @@ func (f *Funder) GetChannelAddresses(chans *[]rpc.FundChannelStartRequest) (*Fun
 	}
 
 	for i, c := range *chans {
-		result, err := rpc.FundChannelStart(c.Id, c.Amount)
+		result, err := f.Lightning.StartFundChannel(c.Id, c.Amount, c.Announce, nil)
 		if err != nil {
+			log.Printf("fund start error: %s", err.Error())
 			return nil, err
 		}
-		addr, err := btcutil.DecodeAddress(result.FundingAddress, f.BitcoinNet)
+		addr, err := btcutil.DecodeAddress(result, f.BitcoinNet)
 		addr.ScriptAddress()
 
 		amt := int64(c.Amount) // difference in wire and glightning
-		outputs[c.Id] = &wallet.Outputs{Vout: i, Amount: amt, Script: addr.ScriptAddress()}
+		outputs[c.Id] = &wallet.Outputs{Vout: uint16(i), Amount: amt, Script: addr.ScriptAddress()}
 		recipamt += amt
-		recipients = append(recipients, &wallet.TxRecipient{Address: result.FundingAddress, Amount: amt})
+		recipients = append(recipients, &wallet.TxRecipient{Address: result, Amount: amt})
 	}
 
 	if utxoamt-fee > wallet.DUST_LIMIT { // no change if dust, save on tx fee
@@ -124,10 +124,10 @@ func (f *Funder) GetChannelAddresses(chans *[]rpc.FundChannelStartRequest) (*Fun
 	return fundinfo, nil
 }
 
-func (f *Funder) CompleteChannels(tx wallet.Transaction, outputs map[string]*wallet.Outputs) ([]*rpc.FundChannelCompleteResponse, error) {
-	channels := make([]*rpc.FundChannelCompleteResponse, 0)
+func (f *Funder) CompleteChannels(tx wallet.Transaction, outputs map[string]*wallet.Outputs) ([]string, error) {
+	channels := make([]string, 0)
 	for k, o := range outputs {
-		cid, err := rpc.FundChannelComplete(k, tx.TxId, o.Vout)
+		cid, err := f.Lightning.CompleteFundChannel(k, tx.TxId, o.Vout)
 		if err != nil {
 			return nil, err
 		}

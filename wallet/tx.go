@@ -18,7 +18,7 @@ type Transaction struct {
 }
 
 type Outputs struct {
-	Vout   int    `json:"vout"`
+	Vout   uint16 `json:"vout"`
 	Amount int64  `json:"amount"`
 	Script []byte `json:"script"`
 }

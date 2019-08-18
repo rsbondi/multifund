@@ -5,8 +5,8 @@ import (
 	"log"
 
 	"github.com/btcsuite/btcd/wire"
+	"github.com/niftynei/glightning/glightning"
 	"github.com/niftynei/glightning/jrpc2"
-	"github.com/rsbondi/multifund/rpc"
 	"github.com/rsbondi/multifund/wallet"
 )
 
@@ -14,7 +14,7 @@ const FundMultiDescription = `Use external wallet funding feature to build a tra
 {channels} is an array of object{"id" string, "satoshi" int, "announce" bool}`
 
 type MultiChannel struct {
-	Channels []rpc.FundChannelStartRequest
+	Channels []glightning.FundChannelStart
 }
 
 func (m *MultiChannel) Call() (jrpc2.Result, error) {
@@ -33,7 +33,7 @@ type ConnectAndFundChannelRequest struct {
 	Id       string  `json:"id"`
 	Host     string  `json:"host,omitempty"`
 	Port     float64 `json:"port,omitempty"`
-	Amount   float64 `json:"satoshi"`
+	Amount   uint64  `json:"satoshi"`
 	FeeRate  string  `json:"feerate,omitempty"`
 	Announce bool    `json:"announce"`
 }
@@ -55,13 +55,13 @@ func (f *MultiChannelWithConnect) New() interface{} {
 }
 
 func connectAndCreateMulti(chans *[]ConnectAndFundChannelRequest) (jrpc2.Result, error) {
-	createChans := make([]rpc.FundChannelStartRequest, 0)
+	createChans := make([]glightning.FundChannelStart, 0)
 	for _, c := range *chans {
 		_, err := fundr.Lightning.Connect(c.Id, c.Host, uint(c.Port))
 		if err != nil {
 			return nil, err
 		}
-		newone := rpc.FundChannelStartRequest{
+		newone := glightning.FundChannelStart{
 			Id:       c.Id,
 			Amount:   c.Amount,
 			FeeRate:  c.FeeRate,
@@ -73,10 +73,10 @@ func connectAndCreateMulti(chans *[]ConnectAndFundChannelRequest) (jrpc2.Result,
 	return createMulti(&createChans)
 }
 
-func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
+func createMulti(chans *[]glightning.FundChannelStart) (jrpc2.Result, error) {
 	info, err := fundr.GetChannelAddresses(chans)
 	if err != nil {
-		cancelMulti(info.Outputs)
+		cancelMulti(chans)
 		return nil, err
 	}
 
@@ -104,9 +104,9 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 	}
 
 	return struct {
-		Tx       string                             `json:"tx"`
-		Txid     string                             `json:"txid"`
-		Channels []*rpc.FundChannelCompleteResponse `json:"channels"`
+		Tx       string   `json:"tx"`
+		Txid     string   `json:"txid"`
+		Channels []string `json:"channels"`
 	}{
 		tx.String(),
 		txid,
@@ -114,9 +114,9 @@ func createMulti(chans *[]rpc.FundChannelStartRequest) (jrpc2.Result, error) {
 	}, nil
 }
 
-func cancelMulti(outputs map[string]*wallet.Outputs) {
-	for k, _ := range outputs {
-		_, err := rpc.FundChannelCancel(k)
+func cancelMulti(chans *[]glightning.FundChannelStart) {
+	for _, ch := range *chans {
+		_, err := fundr.Lightning.CancelFundChannel(ch.Id)
 		if err != nil {
 			log.Printf("fundchannel_cancel error: %s", err.Error())
 		}
