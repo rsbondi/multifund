@@ -18,7 +18,6 @@ import (
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/rsbondi/multifund/rpc"
 )
 
 type BitcoinWallet struct {
@@ -28,24 +27,20 @@ type BitcoinWallet struct {
 	rpcpassword string
 }
 
-func NewBitcoinWallet() *BitcoinWallet {
-	cfg, err := rpc.ListConfigs()
-	if err != nil {
-		log.Fatal(err)
-	}
+func NewBitcoinWallet(cfg map[string]interface{}) *BitcoinWallet {
 	var host, user, pass string
 	var port string
-	if cfg.BitcoinRpcConnect != "" && cfg.BitcoinRpcUser != "" && cfg.BitcoinRpcPassword != "" {
-		user = cfg.BitcoinRpcUser
-		pass = cfg.BitcoinRpcPassword
-		connect := strings.Split(cfg.BitcoinRpcConnect, ":")
+	if cfg["bitcoin-rpcconnect"] != nil && cfg["bitcoin-rpcuser"] != nil && cfg["bitcoin-rpcpassword"] != nil {
+		user = cfg["bitcoin-rpcuser"].(string)
+		pass = cfg["bitcoin-rpcpassword"].(string)
+		connect := strings.Split(cfg["bitcoin-rpcconnect"].(string), ":")
 		host = connect[0]
 		port = connect[1]
-	} else if cfg.BitcoinRpcPort != "" && cfg.BitcoinRpcUser != "" && cfg.BitcoinRpcPassword != "" {
-		user = cfg.BitcoinRpcUser
-		pass = cfg.BitcoinRpcPassword
+	} else if cfg["bitcoin-rpcport"] != nil && cfg["bitcoin-rpcuser"] != nil && cfg["bitcoin-rpcpassword"] != nil {
+		user = cfg["bitcoin-rpcuser"].(string)
+		pass = cfg["bitcoin-rpcpassword"].(string)
 		host = "127.0.0.1"
-		port = cfg.BitcoinRpcPort
+		port = cfg["bitcoin-rpcport"].(string)
 	} else {
 		userdir, err := os.UserHomeDir()
 		if err != nil {

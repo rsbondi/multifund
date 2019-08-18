@@ -8,7 +8,6 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/niftynei/glightning/glightning"
 	"github.com/rsbondi/multifund/funder"
-	"github.com/rsbondi/multifund/rpc"
 	"github.com/rsbondi/multifund/wallet"
 )
 
@@ -22,7 +21,6 @@ func main() {
 	plugin = glightning.NewPlugin(onInit)
 	fundr = &funder.Funder{}
 	fundr.Lightning = glightning.NewLightning()
-	rpc.Init(fundr.Lightning)
 
 	registerOptions(plugin)
 	registerMethods(plugin)
@@ -45,14 +43,14 @@ func onInit(plugin *glightning.Plugin, options map[string]string, config *glight
 	}
 	fundr.Lightning.StartUp(config.RpcFile, config.LightningDir)
 
-	fundr.Bitcoin = wallet.NewBitcoinWallet()
+	cfg, err := fundr.Lightning.ListConfigs()
 
-	cfg, err := rpc.ListConfigs()
 	if err != nil {
 		log.Fatal(err)
 	}
+	fundr.Bitcoin = wallet.NewBitcoinWallet(cfg)
 
-	switch cfg.Network {
+	switch cfg["network"] {
 	case "bitcoin":
 		fundr.BitcoinNet = &chaincfg.MainNetParams
 	case "regtest":
