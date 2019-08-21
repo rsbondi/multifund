@@ -195,7 +195,21 @@ func (i *InternalWallet) Sign(tx *Transaction, utxos []UTXO) {
 			txToSign.TxIn[n].SignatureScript = append([]byte{0x16}, scriptpubkey...)
 		}
 
-		witSig, err := txscript.WitnessSignature(txToSign, txscript.NewTxSigHashes(txToSign), n, int64(u.Amount), scriptpubkey, txscript.SigHashAll, pk, true)
+		// need to find input index, not in sequence if created elsewhere
+		vin := -1
+	FindVin:
+		for o, in := range txToSign.TxIn {
+			for _, u := range utxos {
+				if u.OutPoint.String() == in.PreviousOutPoint.String() {
+					vin = o
+					break FindVin
+				}
+			}
+		}
+		if vin == -1 {
+			log.Printf("cannot create find input to sign: %s", err.Error())
+		}
+		witSig, err := txscript.WitnessSignature(txToSign, txscript.NewTxSigHashes(txToSign), vin, int64(u.Amount), scriptpubkey, txscript.SigHashAll, pk, true)
 		if err != nil {
 			log.Printf("cannot create sig script: %s", err.Error())
 		}
