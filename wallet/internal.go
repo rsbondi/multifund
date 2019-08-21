@@ -169,7 +169,7 @@ func (i *InternalWallet) Sign(tx *Transaction, utxos []UTXO) {
 		log.Printf("cannot open database: %s", err.Error())
 	}
 
-	for n, u := range utxos {
+	for _, u := range utxos {
 		t, err := btcutil.NewTxFromBytes(partial)
 		txToSign := t.MsgTx()
 
@@ -189,12 +189,6 @@ func (i *InternalWallet) Sign(tx *Transaction, utxos []UTXO) {
 		}
 		pk, _ := key.ECPrivKey()
 
-		if txscript.IsPayToScriptHash(scriptpubkey) {
-			h160 := btcutil.Hash160(pk.PubKey().SerializeCompressed())
-			scriptpubkey = append([]byte{0x00, 0x14}, h160...)
-			txToSign.TxIn[n].SignatureScript = append([]byte{0x16}, scriptpubkey...)
-		}
-
 		// need to find input index, not in sequence if created elsewhere
 		vin := -1
 	FindVin:
@@ -208,13 +202,20 @@ func (i *InternalWallet) Sign(tx *Transaction, utxos []UTXO) {
 		}
 		if vin == -1 {
 			log.Printf("cannot create find input to sign: %s", err.Error())
+			return
 		}
+		if txscript.IsPayToScriptHash(scriptpubkey) {
+			h160 := btcutil.Hash160(pk.PubKey().SerializeCompressed())
+			scriptpubkey = append([]byte{0x00, 0x14}, h160...)
+			txToSign.TxIn[vin].SignatureScript = append([]byte{0x16}, scriptpubkey...)
+		}
+
 		witSig, err := txscript.WitnessSignature(txToSign, txscript.NewTxSigHashes(txToSign), vin, int64(u.Amount), scriptpubkey, txscript.SigHashAll, pk, true)
 		if err != nil {
 			log.Printf("cannot create sig script: %s", err.Error())
 		}
 
-		txToSign.TxIn[n].Witness = witSig
+		txToSign.TxIn[vin].Witness = witSig
 
 		var txsig bytes.Buffer
 		if err != nil {
