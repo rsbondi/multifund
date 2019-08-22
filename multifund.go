@@ -81,4 +81,11 @@ func registerMethods(p *glightning.Plugin) {
 	multiw.LongDesc = `{destinations} consist of an array of{"destination": ADDRESS, "satoshi": n}`
 	p.RegisterMethod(multiw)
 
+	multix := glightning.NewRpcMethod(&MultiChannelExternal{}, `Get addresses for external transaction creation`)
+	multix.LongDesc = FundExternalDescription
+	p.RegisterMethod(multix)
+
+	multixc := glightning.NewRpcMethod(&MultiChannelExternalComplete{}, `Complete funding and send transaction`)
+	multixc.LongDesc = FundExternalDescription
+	p.RegisterMethod(multixc)
 }
