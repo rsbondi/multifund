@@ -1,10 +1,13 @@
 package funder
 
 import (
+	"bytes"
+	"encoding/hex"
 	"errors"
 	"log"
 
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 	"github.com/niftynei/glightning/glightning"
 	"github.com/rsbondi/multifund/wallet"
@@ -126,8 +129,26 @@ func (f *Funder) GetChannelAddresses(chans *[]glightning.FundChannelStart) (*Fun
 
 func (f *Funder) CompleteChannels(tx wallet.Transaction, outputs map[string]*wallet.Outputs) ([]string, error) {
 	channels := make([]string, 0)
+	wtx := wire.NewMsgTx(2)
+	r := bytes.NewReader(tx.Signed)
+	wtx.Deserialize(r)
+
 	for k, o := range outputs {
-		cid, err := f.Lightning.CompleteFundChannel(k, tx.TxId, o.Vout)
+		vout := -1
+		for v, txout := range wtx.TxOut {
+			log.Printf("finding output index: %v %v %d", txout.PkScript[2:], o.Script, v)
+			if hex.EncodeToString(txout.PkScript[2:]) == hex.EncodeToString(o.Script) {
+				if o.Amount != txout.Value {
+					return nil, errors.New("Can not find output in transaction")
+				}
+				vout = v
+				break
+			}
+		}
+		if vout == -1 {
+			return nil, errors.New("Can not find output in transaction")
+		}
+		cid, err := f.Lightning.CompleteFundChannel(k, tx.TxId, uint16(vout))
 		if err != nil {
 			return nil, err
 		}
