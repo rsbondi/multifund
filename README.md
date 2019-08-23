@@ -9,7 +9,7 @@ the channel part, so it seemed logical to add as well.
 
 ### Usage
 
-Currently there are 2 new RPC commands for channel funding
+Currently there are 2 new RPC commands for channel funding using either bitcoin core wallet or lightning **internal wallet**
 
 `fund_multi` and `connect_fund_multi`
 
@@ -17,7 +17,18 @@ Currently there are 2 new RPC commands for channel funding
 
 `connect_fund_multi` adds `"host"` and `"port"` parameters to the above
 
-Also one command has been added for multi destination withdraw
+For use with an **external wallet**
+
+`fund_multi_start` same format as `fund_multi`
+
+This will return the addresses to be used for transaction creation in external wallet.
+Once the transaction is created and signed with eternal wallet call
+
+`fund_multi_complete tx` where tx is the hex string of the signed transaction.
+This will line up the addresses and index in the transaction and complete channel funding (internal call to `fundchannel_complete`)
+and broadcast the transaction
+
+Also one command has been added for multi destination **withdraw**
 
 `withdraw_multi [{"destination": ADDRESS, "satoshi": n}...]`
 
@@ -31,7 +42,6 @@ The bitcoin core node is used for broadcasting transactions so it must be access
 
 TODO:
 * Allow to set `feerate` and `minconf` on `withdraw_multi` to be consistent with `withdraw`
-* Update to use rpc commands that were not available but have since been added to glightning
 * Support for bitcoin cookie auth?
 
 [demo video](https://www.youtube.com/watch?v=exDYLpTncng&feature=youtu.be)
