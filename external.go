@@ -16,7 +16,7 @@ const FundExternalDescription = `Use external wallet funding feature to provide 
 {channels} is an array of object{"id" string, "satoshi" int, "announce" bool}`
 
 type MultiChannelExternal struct {
-	Channels []glightning.FundChannelStart
+	Channels []glightning.FundChannelStart `json:"channels"`
 }
 
 func (m *MultiChannelExternal) Call() (jrpc2.Result, error) {

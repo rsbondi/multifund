@@ -14,7 +14,7 @@ const FundMultiDescription = `Use external wallet funding feature to build a tra
 {channels} is an array of object{"id" string, "satoshi" int, "announce" bool}`
 
 type MultiChannel struct {
-	Channels []glightning.FundChannelStart
+	Channels []glightning.FundChannelStart `json:"channels"`
 }
 
 func (m *MultiChannel) Call() (jrpc2.Result, error) {
@@ -39,7 +39,7 @@ type ConnectAndFundChannelRequest struct {
 }
 
 type MultiChannelWithConnect struct {
-	Channels []ConnectAndFundChannelRequest
+	Channels []ConnectAndFundChannelRequest `json:"channels"`
 }
 
 func (m *MultiChannelWithConnect) Call() (jrpc2.Result, error) {

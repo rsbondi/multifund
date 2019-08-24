@@ -20,7 +20,7 @@ type MultiWithdrawRequest struct {
 }
 
 type MultiWithdraw struct {
-	Targets []MultiWithdrawRequest
+	Targets []MultiWithdrawRequest `json:"destinations"`
 }
 
 func (m *MultiWithdraw) Call() (jrpc2.Result, error) {
