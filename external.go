@@ -63,13 +63,13 @@ func completeMultiExt(raw string) (jrpc2.Result, error) {
 
 	channels, err := fundr.CompleteChannels(tx, outputs)
 	if err != nil {
-		closeMulti(outputs)
+		cancelMultiExt(outputs)
 		return nil, err
 	}
 
 	txid, err := fundr.Bitcoin.SendTx(tx.String())
 	if err != nil {
-		closeMulti(outputs)
+		cancelMultiExt(outputs)
 		return nil, err
 	}
 

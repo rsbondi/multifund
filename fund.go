@@ -93,13 +93,13 @@ func createMulti(chans *[]glightning.FundChannelStart) (jrpc2.Result, error) {
 
 	channels, err := fundr.CompleteChannels(tx, info.Outputs)
 	if err != nil {
-		closeMulti(info.Outputs)
+		cancelMultiExt(info.Outputs)
 		return nil, err
 	}
 
 	txid, err := fundr.Bitcoin.SendTx(tx.String())
 	if err != nil {
-		closeMulti(info.Outputs)
+		cancelMultiExt(info.Outputs)
 		return nil, err
 	}
 
@@ -123,11 +123,11 @@ func cancelMulti(chans *[]glightning.FundChannelStart) {
 	}
 }
 
-func closeMulti(outputs map[string]*wallet.Outputs) {
+func cancelMultiExt(outputs map[string]*wallet.Outputs) {
 	for k, _ := range outputs {
-		_, err := fundr.Lightning.CloseNormal(k)
+		_, err := fundr.Lightning.CancelFundChannel(k)
 		if err != nil {
-			log.Printf("channel close error: %s", err.Error())
+			log.Printf("channel cancel error: %s", err.Error())
 		}
 	}
 }
