@@ -94,7 +94,7 @@ func (f *Funder) GetChannelAddresses(chans *[]glightning.FundChannelStart) (*Fun
 	}
 
 	for i, c := range *chans {
-		result, err := f.Lightning.StartFundChannel(c.Id, c.Amount, c.Announce, nil)
+		result, err := f.Lightning.StartFundChannel(c.Id, c.Amount, c.Announce, glightning.NewFeeRate(0, 2000)) // TODO: check for feerate
 		if err != nil {
 			log.Printf("fund start error: %s", err.Error())
 			return nil, err
